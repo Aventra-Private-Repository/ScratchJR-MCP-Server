@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "scratchjr": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "C:\\Users\\SkieHackerYT\\Desktop\\[MCP SERVER]\\src\\server.js"
+      ]
+    }
+  }
+}

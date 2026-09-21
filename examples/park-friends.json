@@ -1,0 +1,28 @@
+{
+  "project": {
+    "name": "Park Friends",
+    "pages": [{
+      "background": "Park.svg",
+      "texts": [{"text":"Park Friends","x":240,"y":40,"size":36,"color":"#287f46"}],
+      "characters": [{
+        "name":"Tic", "asset":"Blue.svg", "x":100, "y":245, "scale":0.5,
+        "scripts":[[
+          {"op":"onflag"},
+          {"op":"say","value":"Hello!"},
+          {"op":"repeat","value":3,"body":[{"op":"forward","value":1},{"op":"hop","value":1}]},
+          {"op":"message","value":"Orange"},
+          {"op":"endstack"}
+        ]]
+      }, {
+        "name":"Dog", "asset":"Dog.svg", "x":340, "y":270, "scale":0.45,
+        "scripts":[[
+          {"op":"onmessage","value":"Orange"},
+          {"op":"hop","value":2},
+          {"op":"say","value":"Woof!"},
+          {"op":"playsnd"},
+          {"op":"endstack"}
+        ]]
+      }]
+    }]
+  }
+}

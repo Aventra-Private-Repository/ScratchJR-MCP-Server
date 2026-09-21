@@ -1,0 +1,6 @@
+node_modules/
+.reference/
+backups/
+artifacts/
+*.log
+.env

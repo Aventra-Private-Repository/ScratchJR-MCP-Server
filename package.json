@@ -1,0 +1,17 @@
+{
+  "name": "scratchjr-desktop-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP tools for creating and running real ScratchJr Desktop projects",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js",
+    "doctor": "node scripts/doctor.js",
+    "test:live": "node scripts/live-test.js",
+    "test:extended": "node scripts/extended-live-test.js",
+    "setup": "node scripts/setup.js"
+  },
+  "dependencies": { "@modelcontextprotocol/sdk": "1.30.0", "zod": "^4.3.6", "ws": "^8.19.0" }
+}
