@@ -175,7 +175,7 @@ export class ScratchJrService {
 export const guide={
   workflow:['connect','list_assets and block_reference','create_project with complete pages, characters, and scripts','run_project','screenshot','stop_project with reset=true','save_project'],
   editing:'Get project first. Edit using page IDs, object IDs, and expectedRevision. Edits preserve objects that are not mentioned. Batch edits into one call.',
-  coordinates:'Stage is 480×360. x increases right, y increases down. Use x/y for initial character position. Movement uses 24-pixel steps.',
+  coordinates:'Stage is 480×360. x increases right, y increases down. Use x/y for initial character position. Movement uses 24-pixel steps. Text x/y is the centre of the text, not its left edge, so a title reads best at x 240; a small x clips it off the left of the stage.',
   limits:'ScratchJr supports 4 pages and the listed blocks. It has no variables, scores, keyboard controls, or general arithmetic. Use click events, collision events, colored messages, and page transitions for interactive stories and games.',
   scripts:'Each script is an array of {op,value?,body?}. Use onflag/onclick/ontouch/onmessage first for automatic execution. repeat owns body; forever repeats the whole strip and is last.',
   persistence:'Writes go through the running app and flush to disk. Automatic database backups precede changes. Never edit the SQLite file while ScratchJr is running.',

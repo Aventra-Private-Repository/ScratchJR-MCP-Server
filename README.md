@@ -6,7 +6,7 @@ Create, edit, run, and inspect real ScratchJr Desktop projects through an MCP cl
 
 Use natural-language requests to build interactive stories, animations, and simple games with characters, backgrounds, text, sounds, and programming blocks. The server also provides screenshots, custom SVG artwork, and automatic database backups.
 
-**Already set up on this PC:** `ScratchJR (Modified by Kerneil Gocotano) v1.0.1` is built and installed, and the server dependencies are in place. The `scratchjr` entry is registered with Claude Desktop, Claude Code, and Codex, all three pointing at `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP\src\server.js`. Restart Claude or start a new Codex session to load the tools. Cursor and Antigravity are not registered yet; see sections 5 and 6. The installation steps below are for setting up another PC or reinstalling this project.
+**Already set up on this PC:** `ScratchJR (Modified by Kerneil Gocotano) v1.0.1` is built and installed, and the server dependencies are in place. The `scratchjr` entry is registered with Claude Desktop, Claude Code, and Codex, all three pointing at `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP\src\server.js`. Google Antigravity is registered too, in `%USERPROFILE%\.gemini\config\mcp_config.json`. Restart Claude, start a new Codex session, and refresh Antigravity's MCP server list to load the tools. Cursor is not installed on this PC; section 5 covers it when it is. The installation steps below are for setting up another PC or reinstalling this project.
 
 ## Requirements:
 
