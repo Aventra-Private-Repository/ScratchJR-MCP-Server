@@ -1,5 +1,5 @@
 [mcp_servers.scratchjr]
 command = "C:\\Program Files\\nodejs\\node.exe"
-args = ["C:\\Users\\SkieHackerYT\\Desktop\\[MCP SERVER]\\src\\server.js"]
+args = ["C:\\Users\\SkieHackerYT\\Documents\\Gitlab\\ScratchJR-MCP\\src\\server.js"]
 startup_timeout_sec = 30
 tool_timeout_sec = 120

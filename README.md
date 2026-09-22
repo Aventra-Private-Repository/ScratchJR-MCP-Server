@@ -6,33 +6,96 @@ Create, edit, run, and inspect real ScratchJr Desktop projects through an MCP cl
 
 Use natural-language requests to build interactive stories, animations, and simple games with characters, backgrounds, text, sounds, and programming blocks. The server also provides screenshots, custom SVG artwork, and automatic database backups.
 
-**Already set up on this PC:** ScratchJr Desktop and the server dependencies are installed; `scratchjr` is registered with Codex and Claude Code; Claude Desktop's configuration is written. Claude Code's connection check passed. Restart Claude or start a new Codex session to load the tools. The installation steps below are for setting up another PC or reinstalling this project.
+**Already set up on this PC:** `ScratchJR (Modified by Kerneil Gocotano) v1.0.1` is built and installed, and the server dependencies are in place. The `scratchjr` entry is registered with Claude Desktop, Claude Code, and Codex, all three pointing at `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP\src\server.js`. Restart Claude or start a new Codex session to load the tools. Cursor and Antigravity are not registered yet; see sections 5 and 6. The installation steps below are for setting up another PC or reinstalling this project.
 
 ## Requirements:
 
 | Requirement | Details |
 | --- | --- |
 | Operating system | Windows with PowerShell; this integration was tested on Windows |
-| ScratchJr | ScratchJr Desktop community port, tested with version 1.3.2 |
+| ScratchJr | Either the bundled build in `desktop/`, `ScratchJR (Modified by Kerneil Gocotano) v1.0.1`, or a stock ScratchJr Desktop community port, tested with version 1.3.2 |
 | Node.js and npm | Node.js 22 or newer; tested with Node 24. npm is used to install server dependencies |
 | AI client | Claude Desktop, Claude Code, Codex, Cursor, or Google Antigravity with local MCP support; run the client on the same Windows PC as ScratchJr |
 | CLI registration | Install the Claude Code or Codex CLI and make it available on PATH if you want the setup script to register that client automatically. Claude Desktop setup does not require these CLIs |
-| Project files | This repository, including `package.json`, `package-lock.json`, `src/`, and `scripts/` |
+| Project files | This repository, including `package.json`, `package-lock.json`, `src/`, `scripts/`, `install.cmd`, and `desktop/` for the bundled build |
 | Internet access | Needed to download software, install npm dependencies, and use your AI client |
 | Local storage | Write access to ScratchJr's Documents folder and this server's `backups/` and `artifacts/` folders |
+| Disk space for the bundled build | Around 1 GB once built: 0.4 GB of dependencies under `desktop/node_modules`, 0.5 GB of build output under `desktop/out` including a 124 MB installer, plus roughly another 0.5 GB used temporarily while packaging. Not needed if you use a stock ScratchJr install |
 
 This integration controls ScratchJr Desktop. The tablet version and Scratch 3 use different integrations.
 
+## Bundled desktop app: ScratchJR (Modified by Kerneil Gocotano) v1.0.1
+
+`desktop/` holds a full copy of the ScratchJr Desktop community port with the MCP bridge built into it. The stock app only exposes the local connection this server needs when the server launches the app itself, so a window that a child already had open could not be driven, and the server had to ask for the app to be closed and reopened. The modified build opens that connection on `127.0.0.1:9223` as it starts, so the server attaches to whichever window is already running.
+
+The build also reports its identity through `scratchjr_status`, which returns `build` and `buildVersion` alongside the ScratchJr data version.
+
+It installs to `%LOCALAPPDATA%\ScratchJR-Modified-KerneilGocotano\app-1.0.1\ScratchJr.exe`. Projects still live in `Documents\ScratchJR\scratchjr.sqllite`, the same file the stock app uses, so existing projects carry over untouched.
+
+See **Installation Setup** below for how to build and install it. `desktop/UPSTREAM.md` records the upstream commit this copy came from and every modification made to it, so the changes can be re-applied to a newer upstream release.
+
+### Using the stock app instead
+
+The server still works with an unmodified ScratchJr Desktop installation. It looks for the modified build first and falls back to `%LOCALAPPDATA%\ScratchJr\app-*\ScratchJr.exe`, so nothing needs to be uninstalled. With the stock app, the server must launch ScratchJr itself; if the app is already open, it will ask you to save and close it first.
+
+### Renaming the build
+
+Product name, version, installer name, and debug port live in `desktop/src/branding.js`, and nothing else hardcodes them. Note that MIT's trademark policy, in `desktop/TRADEMARKS`, expects a build with added features to drop the ScratchJr marks and use its own name; that matters if you publish the installer rather than build it for yourself.
+
 ## Installation Setup:
 
+There are two ways to install. Both finish with the same MCP registration, so the client sections further down apply either way.
+
+| Path | What you get | When to use it |
+| --- | --- | --- |
+| **One-click** | Builds and installs `ScratchJR (Modified by Kerneil Gocotano) v1.0.1` from `desktop/`, then registers the MCP server | The normal choice. The app opens the MCP connection by itself, so nothing has to be closed and reopened |
+| **Manual** | Uses a stock ScratchJr Desktop download and sets the server up step by step | You want the unmodified app, or the one-click build failed and you are working through it |
+
+Paths in this document are for this PC, where the project lives at `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP`. On another machine, replace that folder and the Windows account name throughout.
+
+### One-click install
+
+Double-click `install.cmd` in the project folder, or run:
+
+```powershell
+Set-Location 'C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP'
+npm.cmd run one-click
+```
+
+It runs these steps in order and stops at the first failure with a message naming the step:
+
+1. Installs this server's dependencies.
+2. Installs the desktop app's dependencies in `desktop\` — around 900 packages, and the slowest step.
+3. Downloads the Electron 1.8.2 runtime. npm 11 defers that package's install script, so it is fetched explicitly.
+4. Builds `desktop\out\make\squirrel.windows\x64\ScratchJR (Modified by Kerneil Gocotano)-1.0.1 Setup.exe`.
+5. Runs that installer, which installs to `%LOCALAPPDATA%\ScratchJR-Modified-KerneilGocotano\app-1.0.1\` and starts the app.
+6. Registers the server with Claude Desktop, Claude Code, and Codex.
+
+Expect fifteen to twenty minutes the first time, most of it in steps 2 and 4. Windows SmartScreen may warn about the installer: it is unsigned because it is built on your machine rather than downloaded from a signed release.
+
+Afterwards, restart Claude and start a new Codex session. Cursor and Antigravity still need the manual configuration in sections 5 and 6.
+
+To repeat a single stage instead of the whole run:
+
+```powershell
+npm.cmd run app:install   # desktop app dependencies only
+npm.cmd run app:make      # build the installer only
+npm.cmd run app:start     # run the app from source without installing it
+npm.cmd run setup         # client registration only
+```
+
 ### 1. Install and initialize ScratchJr Desktop
+
+Skip this if you used the one-click install, which already put an app in place.
 
 1. Open the [ScratchJr Desktop download page](https://jfo8000.github.io/ScratchJr-Desktop/) and select the Windows installer. This is the community desktop port.
 2. Run the installer, then launch ScratchJr Desktop.
 3. Create a small project, return to the project library to save it, and close ScratchJr.
 4. Confirm the database exists at `C:\Users\SkieHackerYT\Documents\ScratchJR\scratchjr.sqllite`. On another PC, replace `SkieHackerYT` with that Windows account's name. The desktop port stores its projects in this Documents folder. See the [desktop project's storage documentation](https://jfo8000.github.io/ScratchJr-Desktop/#wheres-the-data).
 
-The server automatically looks for the versioned executable under `%LOCALAPPDATA%\ScratchJr\app-*\ScratchJr.exe`. For a custom installation or redirected Documents folder, configure `SCRATCHJR_EXE` or `SCRATCHJR_DATABASE` as described below.
+The server looks for the modified build first, at `%LOCALAPPDATA%\ScratchJR-Modified-KerneilGocotano\app-*\ScratchJr.exe`, and falls back to a stock install at `%LOCALAPPDATA%\ScratchJr\app-*\ScratchJr.exe`. Both can be installed at the same time. For a custom installation or a redirected Documents folder, set `SCRATCHJR_EXE` or `SCRATCHJR_DATABASE` as described below.
+
+Both builds read and write the same `scratchjr.sqllite`. Run only one of them at a time: each holds the database in memory and writes its copy back when it closes, so whichever closes last overwrites the other's work.
 
 ### 2. Prepare the local assets folder
 
@@ -61,14 +124,14 @@ node --version
 npm.cmd --version
 ```
 
-Open this project's folder and install the locked dependencies. Replace the path if you copied the project elsewhere. The brackets in this folder name require `-LiteralPath`:
+Open this project's folder and install the locked dependencies:
 
 ```powershell
-Set-Location -LiteralPath 'C:\Users\SkieHackerYT\Desktop\[MCP SERVER]'
+Set-Location 'C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP'
 npm.cmd ci
 ```
 
-### 4. Register the server with Claude and Codex
+### 4. Register the server with Claude Desktop, Claude Code, and Codex
 
 From the same project folder, run:
 
@@ -76,15 +139,40 @@ From the same project folder, run:
 npm.cmd run setup
 ```
 
-Setup merges the `scratchjr` entry into Claude Desktop's configuration and registers a user-level server with Claude Code and Codex when their CLIs are available. Existing configuration files are backed up next to their originals. Generated configuration snippets are in `config/`.
+Setup writes the `scratchjr` entry into Claude Desktop's configuration file and registers a user-level server with Claude Code and Codex through their CLIs. Every file it touches is backed up next to the original first. It is safe to run repeatedly: an entry that already points at this folder is left alone.
 
-| Client | Configuration or verification |
-| --- | --- |
-| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json`; fully quit and reopen Claude Desktop |
-| Claude Code | User-level registration; verify with `claude.cmd mcp get scratchjr`, then start a new session |
-| Codex | `%USERPROFILE%\.codex\config.toml`; verify with `codex mcp get scratchjr --json`, then start a new session |
+If a `scratchjr` entry exists but points somewhere else — most often because the project was moved, leaving the old path holding some other server — setup replaces it and prints the path it replaced. This is worth knowing, because a stale entry shows up as a connection error rather than as a missing server, which is easy to misread as the tools themselves being broken.
 
-If a CLI is unavailable, setup prints a warning for that client. Install the missing CLI and rerun setup, or merge the corresponding snippet from `config/` into the client's configuration. Codex's generated configuration uses a 120-second tool timeout for longer editor operations. Keep the server folder at its configured location so the clients can find it.
+| Client | Where the entry goes | How to verify |
+| --- | --- | --- |
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` | Fully quit and reopen Claude Desktop, then look for `scratchjr` under the tools icon |
+| Claude Code | User scope, in `%USERPROFILE%\.claude.json` | `claude.cmd mcp get scratchjr`, then start a new session |
+| Codex | `%USERPROFILE%\.codex\config.toml` | `codex mcp get scratchjr --json`, then start a new session |
+
+Setup also writes ready-made snippets into `config/`:
+
+- [config/claude-desktop.json](config/claude-desktop.json) — the `mcpServers` entry, which suits Cursor and Antigravity as well.
+- [config/codex.toml](config/codex.toml) — the `[mcp_servers.scratchjr]` section, including the timeouts.
+
+**If the Codex CLI is not installed,** setup cannot reach Codex and says so. Open `%USERPROFILE%\.codex\config.toml`, replace any existing `[mcp_servers.scratchjr]` section with the contents of `config/codex.toml`, and leave every other section as it is:
+
+```toml
+[mcp_servers.scratchjr]
+command = "C:\\Program Files\\nodejs\\node.exe"
+args = ["C:\\Users\\SkieHackerYT\\Documents\\Gitlab\\ScratchJR-MCP\\src\\server.js"]
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+```
+
+The timeouts matter. Building a project and taking a screenshot can take longer than Codex's default tool timeout allows.
+
+The same applies to the Claude Code CLI. Without it, Claude Desktop is still configured, and Claude Code can be registered by hand:
+
+```powershell
+claude.cmd mcp add --scope user scratchjr -- 'C:\Program Files\nodejs\node.exe' 'C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP\src\server.js'
+```
+
+Keep the project folder where it is after registering. Moving it breaks every entry, and setup has to be run again from the new location.
 
 ### 5. Add the server to Cursor
 
@@ -96,7 +184,7 @@ Complete steps 1–3 first. `npm.cmd run setup` configures Claude and Codex; **C
 | Scope | Configuration file on this PC |
 | --- | --- |
 | Global | `C:\Users\SkieHackerYT\.cursor\mcp.json` |
-| Project | `C:\Users\SkieHackerYT\Desktop\[MCP SERVER]\.cursor\mcp.json` |
+| Project | `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP\.cursor\mcp.json` |
 
 3. Add the configuration below. If the file already contains servers, merge only the `scratchjr` entry into its existing `mcpServers` object.
 
@@ -106,7 +194,7 @@ Complete steps 1–3 first. `npm.cmd run setup` configures Claude and Codex; **C
     "scratchjr": {
       "command": "C:\\Program Files\\nodejs\\node.exe",
       "args": [
-        "C:\\Users\\SkieHackerYT\\Desktop\\[MCP SERVER]\\src\\server.js"
+        "C:\\Users\\SkieHackerYT\\Documents\\Gitlab\\ScratchJR-MCP\\src\\server.js"
       ]
     }
   }
@@ -118,7 +206,7 @@ Complete steps 1–3 first. `npm.cmd run setup` configures Claude and Codex; **C
 
 Cursor supports both configuration locations; a project entry takes precedence over a global entry with the same name. See the [official Cursor MCP instructions](https://cursor.com/help/customization/mcp).
 
-The JSON uses this PC's paths. On another machine, adjust the Node executable and server path. Keep the doubled backslashes required by JSON. You can also copy this server entry from [config/claude-desktop.json](config/claude-desktop.json).
+The JSON uses this PC's paths. On another machine, adjust the Node executable and the server path. Keep the doubled backslashes required by JSON. You can also copy this entry from [config/claude-desktop.json](config/claude-desktop.json), which setup regenerates with the current path on every run.
 
 ### 6. Add the server to Google Antigravity
 
@@ -133,7 +221,7 @@ Current Antigravity documentation lists these configuration locations:
 | Scope | Configuration file on this PC |
 | --- | --- |
 | Global | `C:\Users\SkieHackerYT\.gemini\config\mcp_config.json` |
-| Workspace | `C:\Users\SkieHackerYT\Desktop\[MCP SERVER]\.agents\mcp_config.json` |
+| Workspace | `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP\.agents\mcp_config.json` |
 
 Prefer the file opened by **View raw config** for your installed IDE version. Antigravity 2.0 exposes server management under **Settings > Customizations > Installed MCP Servers**. See the [official Antigravity MCP instructions](https://antigravity.google/docs/mcp).
 
@@ -141,19 +229,39 @@ Both editors launch `src/server.js` directly using Node and stdio. No MCP URL or
 
 ### 7. Verify the ScratchJr connection
 
-Save and close any ScratchJr window opened through its ordinary shortcut, then run:
+Run the built-in check from the project folder:
 
 ```powershell
-npm.cmd run doctor -- --launch
+npm.cmd run doctor
 ```
 
-This launches ScratchJr with the local connection enabled and reports the detected app settings and projects. To check an already connected app without launching it, use `npm.cmd run doctor`.
+It reports the executable and database the server chose, along with the projects ScratchJr currently holds. With the modified build this works against a window that is already open. If nothing is running, use `npm.cmd run doctor -- --launch` to start the app first. With a stock install, save and close any ScratchJr window opened from its ordinary shortcut before using `--launch`.
 
-In Cursor or Antigravity, try:
+A healthy result names the executable and lists your projects:
+
+```json
+{
+  "config": {
+    "executable": "C:\\Users\\SkieHackerYT\\AppData\\Local\\ScratchJR-Modified-KerneilGocotano\\app-1.0.1\\ScratchJr.exe",
+    "database": "C:\\Users\\SkieHackerYT\\Documents\\ScratchJR\\scratchjr.sqllite"
+  },
+  "app": { "ready": true, "projects": [ { "ID": 1, "NAME": "Project 1" } ] }
+}
+```
+
+Then, in any registered client, try:
 
 > Use the scratchjr tools to create a dancing dog in a park. Build the project, run it, inspect a screenshot, then stop, reset, and save it.
 
-If the tools do not appear, check that `scratchjr` is enabled, the JSON is valid, and both absolute paths exist. Confirm `npm.cmd ci` completed in the server folder, then restart the editor and start a new Agent chat. In Cursor, connection details are available in **Output > MCP Logs**; in Antigravity, inspect the server entry in **Manage MCP Servers**. Follow the editor's tool-approval prompts when shown.
+`scratchjr_status` reports which build answered, as `build` and `buildVersion`. That is the quickest way to tell the modified app from a stock one.
+
+If the tools do not appear:
+
+- Check that `scratchjr` is enabled in the client and that its JSON or TOML is valid.
+- Confirm both absolute paths in the entry exist, especially after moving the project folder. Rerun `npm.cmd run setup` to repair them.
+- Confirm `npm.cmd ci` completed in the server folder, then restart the client and start a new Agent chat.
+- In Cursor, connection details are under **Output > MCP Logs**; in Antigravity, inspect the server entry in **Manage MCP Servers**.
+- Follow the client's tool-approval prompts when shown.
 
 ## Procedure:
 
@@ -183,6 +291,10 @@ The configured MCP client starts `src/server.js` using MCP's standard stdio tran
 The first application tool connects to ScratchJr on **127.0.0.1:9223**, or automatically launches the installed app with that local debugging port. It does not modify the installed application.
 
 If ScratchJr is already running from its ordinary shortcut without the connection enabled, save your work and close it once. Then ask the assistant to connect again. The server does not force-close an existing editor session. You can normally leave the connected app open while using either client. Avoid simultaneous manual edits while an assistant is changing a project.
+
+With the build in `desktop/`, that close-and-reopen step is not needed: the app opens the connection itself as it starts, so the server attaches to a window that is already on screen.
+
+A freshly started ScratchJr sits on the splash screen, which waits for a child to press Start and has none of the project code loaded yet. Connecting moves the app to its project library so the first tool call succeeds. If a child is looking at the splash screen when an assistant connects, that is why the screen changes.
 
 ### Tool reference
 
@@ -226,6 +338,14 @@ npm.cmd run test:extended    # Adds a custom star and second page to the latest 
 | `SCRATCHJR_DATABASE` | `~/Documents/ScratchJR/scratchjr.sqllite` |
 | `SCRATCHJR_BACKUP_DIR` | This server's `backups/` folder |
 | `SCRATCHJR_OUTPUT_DIR` | This server's `artifacts/` folder |
+
+The modified desktop app in `desktop/` reads two more, which only affect the app itself:
+
+| Variable | Effect |
+| --- | --- |
+| `SCRATCHJR_DEBUG_PORT` | Port the app opens for the MCP connection. Set it to `0` to start the app with no MCP listener at all |
+| `SCRATCHJR_DOCUMENTS` | Overrides the Documents root the app reads and writes. Useful for trying a build without touching real projects |
+| `SCRATCHJR_DEVTOOLS` | Set to `1` to open DevTools in a source run. DevTools takes the single debugger slot, so the MCP server cannot attach while it is open |
 
 If you customize settings, use the same values in every client. In the Cursor and Antigravity JSON, place environment settings in an `env` object alongside `command` and `args` within the `scratchjr` entry. If Windows Documents is redirected, set `SCRATCHJR_DATABASE` to the app's actual database path.
 

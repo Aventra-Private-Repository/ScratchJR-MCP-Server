@@ -4,3 +4,4 @@ backups/
 artifacts/
 *.log
 .env
+desktop/out/

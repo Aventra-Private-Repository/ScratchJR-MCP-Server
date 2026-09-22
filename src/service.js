@@ -35,7 +35,7 @@ export class ScratchJrService {
   async status() {
     try {
       await this.bridge.connect(false);
-      return await this.bridge.evaluate(`return {connected:true,url:location.href,version:window.Settings.scratchJrVersion,projectId:SJ.currentProject ? Number(SJ.currentProject) : null,pageId:SJ.stage && SJ.stage.currentPage ? SJ.stage.currentPage.id : null};`);
+      return await this.bridge.evaluate(`return {connected:true,url:location.href,version:window.Settings.scratchJrVersion,build:window.Settings.buildName || 'ScratchJr Desktop (upstream)',buildVersion:window.Settings.buildVersion || null,projectId:SJ.currentProject ? Number(SJ.currentProject) : null,pageId:SJ.stage && SJ.stage.currentPage ? SJ.stage.currentPage.id : null};`);
     } catch(error) {return {connected:false,reason:error.message,executable:config.executable,port:config.port};}
   }
   async assets() {

@@ -4,14 +4,24 @@
   "private": true,
   "type": "module",
   "description": "MCP tools for creating and running real ScratchJr Desktop projects",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test test/*.test.js",
     "doctor": "node scripts/doctor.js",
     "test:live": "node scripts/live-test.js",
     "test:extended": "node scripts/extended-live-test.js",
-    "setup": "node scripts/setup.js"
+    "setup": "node scripts/setup.js",
+    "one-click": "node scripts/one-click.js",
+    "app:install": "npm --prefix desktop install",
+    "app:start": "npm --prefix desktop start",
+    "app:make": "npm --prefix desktop run make64"
   },
-  "dependencies": { "@modelcontextprotocol/sdk": "1.30.0", "zod": "^4.3.6", "ws": "^8.19.0" }
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "^4.3.6",
+    "ws": "^8.19.0"
+  }
 }

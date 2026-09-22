@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { dirname } from 'node:path';
+import { dirname, basename } from 'node:path';
 import { config } from './config.js';
 
 const exec = promisify(execFile);
@@ -40,8 +40,9 @@ export class Bridge {
       if (!launch) throw new Error('ScratchJr is not connected. Call scratchjr_connect.');
       if (!config.executable) throw new Error('ScratchJr executable not found. Set SCRATCHJR_EXE.');
       if (process.platform === 'win32') {
-        const {stdout} = await exec('tasklist.exe', ['/FI','IMAGENAME eq ScratchJr.exe','/FO','CSV','/NH'], {windowsHide:true});
-        if (/"ScratchJr\.exe"/i.test(stdout)) throw new Error('ScratchJr is running without the MCP connection. Save and close ScratchJr, then call scratchjr_connect. It will reopen automatically; no process is forcibly closed.');
+        const image = basename(config.executable);
+        const {stdout} = await exec('tasklist.exe', ['/FI',`IMAGENAME eq ${image}`,'/FO','CSV','/NH'], {windowsHide:true});
+        if (stdout.toLowerCase().includes(`"${image.toLowerCase()}"`)) throw new Error('ScratchJr is running without the MCP connection. Save and close ScratchJr, then call scratchjr_connect. It will reopen automatically; no process is forcibly closed.');
       }
       const env = {...process.env};
       delete env.ELECTRON_RUN_AS_NODE;
@@ -58,6 +59,8 @@ export class Bridge {
     }
     const target = targets?.find(t=>t.type==='page' && /^file:/.test(t.url) && /\/app\/(index|home|editor)\.html/.test(t.url));
     if (!target) throw new Error(`Port ${config.port} is not a supported ScratchJr Desktop window.`);
+    // A page reports no debugger URL while DevTools is attached to it.
+    if (!target.webSocketDebuggerUrl) throw new Error('ScratchJr has DevTools open on its window. Close DevTools, then call scratchjr_connect.');
     const socketUrl = new URL(target.webSocketDebuggerUrl);
     if (!['127.0.0.1','localhost','[::1]'].includes(socketUrl.hostname)) throw new Error('Refusing non-local debug connection');
     const ws = new WebSocket(socketUrl);
@@ -82,6 +85,13 @@ export class Bridge {
     ws.on('close',disconnected); ws.on('error',disconnected);
     await this.waitFor(`typeof window.tablet === 'object' && typeof require === 'function'`, false);
     await this.evaluate(`require('electron').remote.getCurrentWindow().show();return true;`,{},false);
+    // A fresh launch sits on the splash screen, which waits for a child to tap
+    // Start and has none of the editor modules loaded. Step past it so the
+    // first tool call is not met with 'module missing /editor/ScratchJr.js'.
+    if (/\/index\.html$/.test(await this.evaluate(`return location.pathname;`,{},false))) {
+      await this.send('Page.navigate',{url:await this.evaluate(`return new URL('home.html', location.href).href;`,{},false)});
+      await this.waitFor('true');
+    }
   }
   async send(method,params={}) {
     if(this.ws?.readyState!==WebSocket.OPEN) throw new Error('ScratchJr disconnected. Call scratchjr_connect.');
