@@ -5,3 +5,4 @@ artifacts/
 *.log
 .env
 desktop/out/
+desktop/mcp/

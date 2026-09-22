@@ -35,6 +35,10 @@ one-file change; nothing else hardcodes the name.
    occupies the page's single debugger slot, which would otherwise lock the MCP server out.
 5. Sets the window title from `branding.windowTitle` and keeps it there when a page changes its
    own `<title>`.
+6. Loads `shell/shell.html` and routes `databaseRestored` to the editor webview rather than to the
+   window, which now hosts the chat panel instead of the editor.
+7. Adds Settings and About to the File menu, and the small windows they open.
+8. Publishes `global.scratchJrDebug` for `electronClient.js` to read from inside the webview.
 
 ### `src/app/settings.json`
 
@@ -47,15 +51,38 @@ saved projects on that exact value, so changing it would hide every project a ch
 
 `<title>` updated on `index.html`, `home.html`, `editor.html` and `gettingstarted.html`.
 
+### `src/shell/` (new directory)
+
+The window now loads `shell/shell.html` instead of the editor directly. It stacks the editor over an assistant chat panel, with a draggable divider between them.
+
+The editor runs inside a `<webview>` rather than in the window itself. That was the whole reason this layout is possible: a webview guest gets its own viewport, so ScratchJr's percentage-based sizing shrinks into the top pane, and it stays its own debugger target, so the MCP server attaches to the editor rather than to the chat page wrapped around it.
+
+Two sizing traps are worth knowing if this CSS is ever touched. A `<webview>` is a replaced element that falls back to 300x150, and Chrome 58 will not resolve a percentage height against a flex-sized parent. `#sjr` is therefore pinned with `position: absolute` on all four edges.
+
+### `src/ai/` (new directory)
+
+- `settings.js` reads and writes `ai-settings.json` in the Electron userData folder, and holds the provider table.
+- `mcp.js` starts `src/server.js` as a child process and speaks MCP over stdio. It resolves the server path from `__dirname`, not `app.getAppPath()`, which under electron-forge's dev runner points at Electron's own `default_app.asar`.
+- `agent.js` runs the tool-calling loop against the OpenAI chat completions shape, which both DeepSeek and OpenRouter accept.
+- `node-runtime.js` finds a Node 22+ to run the tool server with, and downloads the portable zip into `userData` when the machine has none. The zip is used rather than the installer so no administrator rights, UAC prompt or `PATH` change is involved, and an existing Node is never touched.
+
+### `src/windows/` (new directory)
+
+The Settings and About dialogs, plus the stylesheet they share.
+
+### `src/electronClient.js`
+
+`const DEBUG = remote.getCurrentWebContents().browserWindowOptions.isDebug` threw inside the webview, because a guest webContents carries no `browserWindowOptions`. It killed the script before `window.tablet` existed, which left the editor blank and the MCP server unable to do anything. The flag now falls back to `remote.getGlobal('scratchJrDebug')`, set in `main.js`.
+
 ### `package.json` and `forge.config.js`
 
 Product name, version, author and the Squirrel installer identity. `forge.config.js` reads them
 from `src/branding.js`.
 
-Note that the Squirrel installer name (`ScratchJR-Modified-KerneilGocotano`) cannot match the
+Note that the Squirrel installer name (`ScratchJR-AI-Assisted`) cannot match the
 displayed product name: Squirrel treats it as a NuGet package id, which allows only letters,
 digits, dots, dashes and underscores. It also decides the install path,
-`%LOCALAPPDATA%\ScratchJR-Modified-KerneilGocotano\app-<version>\ScratchJr.exe`.
+`%LOCALAPPDATA%\ScratchJR-AI-Assisted\app-<version>\ScratchJr.exe`.
 
 ## Trademark note
 

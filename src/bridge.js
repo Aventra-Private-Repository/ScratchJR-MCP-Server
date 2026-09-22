@@ -84,7 +84,8 @@ export class Bridge {
     };
     ws.on('close',disconnected); ws.on('error',disconnected);
     await this.waitFor(`typeof window.tablet === 'object' && typeof require === 'function'`, false);
-    await this.evaluate(`require('electron').remote.getCurrentWindow().show();return true;`,{},false);
+    await this.evaluate(`try{require('electron').remote.getCurrentWindow().show();}catch(e){}
+return true;`,{},false);
     // A fresh launch sits on the splash screen, which waits for a child to tap
     // Start and has none of the editor modules loaded. Step past it so the
     // first tool call is not met with 'module missing /editor/ScratchJr.js'.

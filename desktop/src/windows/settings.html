@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Assistant Settings</title>
+<link rel="stylesheet" href="dialog.css">
+</head>
+<body>
+
+<header class="head">
+  <h1>Assistant Settings</h1>
+  <p>Choose a provider and paste your own API key. Nothing is sent anywhere until you send a message.</p>
+</header>
+
+<main class="body">
+  <div class="banner">
+    The key is stored in plain text on this computer, and every message you send costs money on your own account. Do not share this machine's settings file.
+  </div>
+
+  <div class="field">
+    <label class="title">Provider</label>
+    <div class="providers" id="providers"></div>
+  </div>
+
+  <div class="field">
+    <label class="title" for="key">API key</label>
+    <div class="row">
+      <input type="password" id="key" placeholder="Paste your key" spellcheck="false" autocomplete="off">
+      <button type="button" id="reveal">Show</button>
+    </div>
+    <p class="hint">Get one at <a id="key-link"></a></p>
+  </div>
+
+  <div class="field">
+    <label class="title" for="model">Model name</label>
+    <input type="text" id="model" spellcheck="false" autocomplete="off">
+    <p class="hint" id="model-hint"></p>
+  </div>
+
+  <details class="advanced">
+    <summary>Advanced</summary>
+    <div>
+      <div class="field">
+        <label class="title" for="rounds">Tool rounds per message</label>
+        <input type="number" id="rounds" min="1" max="40" step="1">
+        <p class="hint">How many times the assistant may call tools before it has to stop and report back. Lower is cheaper; 12 suits most stories.</p>
+      </div>
+
+      <div class="field">
+        <label class="title" for="node">Node.js path</label>
+        <div class="row">
+          <input type="text" id="node" placeholder="Detected automatically" spellcheck="false" autocomplete="off">
+          <button type="button" id="install-node">Install now</button>
+        </div>
+        <p class="hint" id="node-hint"></p>
+      </div>
+
+      <div class="field">
+        <label class="title" for="server">ScratchJr tool server</label>
+        <input type="text" id="server" placeholder="Detected automatically" spellcheck="false" autocomplete="off">
+        <p class="hint" id="server-hint">Path to <code>src/server.js</code>. Only needed if the bundled copy cannot be found.</p>
+      </div>
+    </div>
+  </details>
+</main>
+
+<footer class="foot">
+  <span class="note" id="status"></span>
+  <span class="spacer"></span>
+  <button type="button" id="cancel">Cancel</button>
+  <button type="button" class="primary" id="save">Save</button>
+</footer>
+
+<script src="settings-window.js"></script>
+</body>
+</html>

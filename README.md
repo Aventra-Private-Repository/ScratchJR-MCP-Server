@@ -6,14 +6,14 @@ Create, edit, run, and inspect real ScratchJr Desktop projects through an MCP cl
 
 Use natural-language requests to build interactive stories, animations, and simple games with characters, backgrounds, text, sounds, and programming blocks. The server also provides screenshots, custom SVG artwork, and automatic database backups.
 
-**Already set up on this PC:** `ScratchJR (Modified by Kerneil Gocotano) v1.0.1` is built and installed, and the server dependencies are in place. The `scratchjr` entry is registered with Claude Desktop, Claude Code, and Codex, all three pointing at `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP\src\server.js`. Google Antigravity is registered too, in `%USERPROFILE%\.gemini\config\mcp_config.json`. Restart Claude, start a new Codex session, and refresh Antigravity's MCP server list to load the tools. Cursor is not installed on this PC; section 5 covers it when it is. The installation steps below are for setting up another PC or reinstalling this project.
+**Already set up on this PC:** `Scratch.JR [ AI-Assisted ] v1.0.2` is built and installed, and the server dependencies are in place. The `scratchjr` entry is registered with Claude Desktop, Claude Code, and Codex, all three pointing at `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP\src\server.js`. Google Antigravity is registered too, in `%USERPROFILE%\.gemini\config\mcp_config.json`. Restart Claude, start a new Codex session, and refresh Antigravity's MCP server list to load the tools. Cursor is not installed on this PC; section 5 covers it when it is. The installation steps below are for setting up another PC or reinstalling this project.
 
 ## Requirements:
 
 | Requirement | Details |
 | --- | --- |
 | Operating system | Windows with PowerShell; this integration was tested on Windows |
-| ScratchJr | Either the bundled build in `desktop/`, `ScratchJR (Modified by Kerneil Gocotano) v1.0.1`, or a stock ScratchJr Desktop community port, tested with version 1.3.2 |
+| ScratchJr | Either the bundled build in `desktop/`, `Scratch.JR [ AI-Assisted ] v1.0.2`, or a stock ScratchJr Desktop community port, tested with version 1.3.2 |
 | Node.js and npm | Node.js 22 or newer; tested with Node 24. npm is used to install server dependencies |
 | AI client | Claude Desktop, Claude Code, Codex, Cursor, or Google Antigravity with local MCP support; run the client on the same Windows PC as ScratchJr |
 | CLI registration | Install the Claude Code or Codex CLI and make it available on PATH if you want the setup script to register that client automatically. Claude Desktop setup does not require these CLIs |
@@ -24,13 +24,13 @@ Use natural-language requests to build interactive stories, animations, and simp
 
 This integration controls ScratchJr Desktop. The tablet version and Scratch 3 use different integrations.
 
-## Bundled desktop app: ScratchJR (Modified by Kerneil Gocotano) v1.0.1
+## Bundled desktop app: Scratch.JR [ AI-Assisted ] v1.0.2
 
 `desktop/` holds a full copy of the ScratchJr Desktop community port with the MCP bridge built into it. The stock app only exposes the local connection this server needs when the server launches the app itself, so a window that a child already had open could not be driven, and the server had to ask for the app to be closed and reopened. The modified build opens that connection on `127.0.0.1:9223` as it starts, so the server attaches to whichever window is already running.
 
 The build also reports its identity through `scratchjr_status`, which returns `build` and `buildVersion` alongside the ScratchJr data version.
 
-It installs to `%LOCALAPPDATA%\ScratchJR-Modified-KerneilGocotano\app-1.0.1\ScratchJr.exe`. Projects still live in `Documents\ScratchJR\scratchjr.sqllite`, the same file the stock app uses, so existing projects carry over untouched.
+It installs to `%LOCALAPPDATA%\ScratchJR-AI-Assisted\app-1.0.2\ScratchJr.exe`. Projects still live in `Documents\ScratchJR\scratchjr.sqllite`, the same file the stock app uses, so existing projects carry over untouched.
 
 See **Installation Setup** below for how to build and install it. `desktop/UPSTREAM.md` records the upstream commit this copy came from and every modification made to it, so the changes can be re-applied to a newer upstream release.
 
@@ -42,13 +42,72 @@ The server still works with an unmodified ScratchJr Desktop installation. It loo
 
 Product name, version, installer name, and debug port live in `desktop/src/branding.js`, and nothing else hardcodes them. Note that MIT's trademark policy, in `desktop/TRADEMARKS`, expects a build with added features to drop the ScratchJr marks and use its own name; that matters if you publish the installer rather than build it for yourself.
 
+## Built-in assistant
+
+The app has its own chat panel under the editor, so a child can ask for a story without Claude Desktop, Codex or any other editor installed. You supply an API key; the app supplies the tools.
+
+```
++-------------------------------+
+|  Scratch.JR editor            |  scrolls on its own
++-------------------------------+
+|  Assistant chat               |  fixed height, scrolls on its own
++-------------------------------+
+```
+
+The split is fixed rather than draggable. The editor is given the room ScratchJr was designed for instead of being squeezed into whatever the window has left, so the stage and the block palette stay a usable size; when the window is shorter than that, the editor pane scrolls.
+
+The panel drives the same MCP tools an external editor would. Internally it starts the server in `src/server.js` as a child process and that server drives the editor back through the debugging port, so one implementation of every tool serves both routes and they cannot drift apart.
+
+### Choosing a provider
+
+Open **File > Settings**. Two providers are offered, both speaking the OpenAI chat completions shape:
+
+| Provider | Endpoint | Default model | Where to get a key |
+| --- | --- | --- | --- |
+| DeepSeek | `api.deepseek.com/v1` | `deepseek-chat` | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) |
+| OpenRouter | `openrouter.ai/api/v1` | `deepseek/deepseek-chat` | [openrouter.ai/keys](https://openrouter.ai/keys) |
+
+Leave **Model name** blank to take the default, or type any model the provider accepts. OpenRouter wants the full slug, such as `openai/gpt-4o-mini`.
+
+Settings are stored in `ai-settings.json` inside the app's `userData` folder, which survives updates. **The API key is written there in plain text**, so treat that file the way you would treat the key itself.
+
+### Cost and the round limit
+
+Every message is a paid request on your own account, and a single story usually costs several requests because the assistant calls tools and reads the results. **Tool rounds per message** under Advanced caps how many times it may do that before it has to stop and report back. Twelve suits most stories; lower it to spend less, raise it for longer builds.
+
+### Node.js installs itself
+
+The assistant runs the tool server with Node 22 or newer. You do not have to install it: the first time you send a message, the app checks for a suitable Node and, finding none, downloads one.
+
+It takes the portable zip rather than the official installer, and unpacks it into the app's own folder under `userData`. That means no administrator rights, no UAC prompt, no change to the machine's `PATH`, and no interference with any Node already installed for other work. Uninstalling the app removes it too. The download is about 36 MB and happens once.
+
+A Node that is already installed and new enough is used as it is and never replaced. One that is too old is left alone as well; the app fetches its own copy alongside it.
+
+**Advanced > Node.js path** shows which Node will be used and offers an **Install now** button to do the download before you need it. Leave the box blank to keep detecting automatically, or point it at a specific `node.exe`.
+
+The editor itself works without Node; only the assistant needs it.
+
+### What the panel shows
+
+Each tool call appears as a collapsible row: click it to see the arguments and the result the model received. Screenshots taken by `scratchjr_screenshot` are shown inline. A failed call opens itself and is marked in red, so a wrong turn is visible rather than buried.
+
+**New chat** clears the conversation and starts the model fresh. **Stop** interrupts a run that is going nowhere; it takes effect after the tool call in flight finishes.
+
+## About
+
+**File > About** lists the credits:
+
+- [jfo8000](https://github.com/jfo8000/ScratchJr-Desktop) — ported version of ScratchJr
+- [SkieAdminYT](https://github.com/SkieAdmin) — MCP and AI integration
+- [MIT Media Lab](https://www.scratchjr.org) — original ScratchJr
+
 ## Installation Setup:
 
 There are two ways to install. Both finish with the same MCP registration, so the client sections further down apply either way.
 
 | Path | What you get | When to use it |
 | --- | --- | --- |
-| **One-click** | Builds and installs `ScratchJR (Modified by Kerneil Gocotano) v1.0.1` from `desktop/`, then registers the MCP server | The normal choice. The app opens the MCP connection by itself, so nothing has to be closed and reopened |
+| **One-click** | Builds and installs `Scratch.JR [ AI-Assisted ] v1.0.2` from `desktop/`, then registers the MCP server | The normal choice. The app opens the MCP connection by itself, so nothing has to be closed and reopened |
 | **Manual** | Uses a stock ScratchJr Desktop download and sets the server up step by step | You want the unmodified app, or the one-click build failed and you are working through it |
 
 Paths in this document are for this PC, where the project lives at `C:\Users\SkieHackerYT\Documents\Gitlab\ScratchJR-MCP`. On another machine, replace that folder and the Windows account name throughout.
@@ -67,8 +126,8 @@ It runs these steps in order and stops at the first failure with a message namin
 1. Installs this server's dependencies.
 2. Installs the desktop app's dependencies in `desktop\` — around 900 packages, and the slowest step.
 3. Downloads the Electron 1.8.2 runtime. npm 11 defers that package's install script, so it is fetched explicitly.
-4. Builds `desktop\out\make\squirrel.windows\x64\ScratchJR (Modified by Kerneil Gocotano)-1.0.1 Setup.exe`.
-5. Runs that installer, which installs to `%LOCALAPPDATA%\ScratchJR-Modified-KerneilGocotano\app-1.0.1\` and starts the app.
+4. Builds `desktop\out\make\squirrel.windows\x64\Scratch.JR [ AI-Assisted ]-1.0.2 Setup.exe`.
+5. Runs that installer, which installs to `%LOCALAPPDATA%\ScratchJR-AI-Assisted\app-1.0.2\` and starts the app.
 6. Registers the server with Claude Desktop, Claude Code, and Codex.
 
 Expect fifteen to twenty minutes the first time, most of it in steps 2 and 4. Windows SmartScreen may warn about the installer: it is unsigned because it is built on your machine rather than downloaded from a signed release.
@@ -93,7 +152,7 @@ Skip this if you used the one-click install, which already put an app in place.
 3. Create a small project, return to the project library to save it, and close ScratchJr.
 4. Confirm the database exists at `C:\Users\SkieHackerYT\Documents\ScratchJR\scratchjr.sqllite`. On another PC, replace `SkieHackerYT` with that Windows account's name. The desktop port stores its projects in this Documents folder. See the [desktop project's storage documentation](https://jfo8000.github.io/ScratchJr-Desktop/#wheres-the-data).
 
-The server looks for the modified build first, at `%LOCALAPPDATA%\ScratchJR-Modified-KerneilGocotano\app-*\ScratchJr.exe`, and falls back to a stock install at `%LOCALAPPDATA%\ScratchJr\app-*\ScratchJr.exe`. Both can be installed at the same time. For a custom installation or a redirected Documents folder, set `SCRATCHJR_EXE` or `SCRATCHJR_DATABASE` as described below.
+The server looks for the modified build first, at `%LOCALAPPDATA%\ScratchJR-AI-Assisted\app-*\ScratchJr.exe`, and falls back to a stock install at `%LOCALAPPDATA%\ScratchJr\app-*\ScratchJr.exe`. Both can be installed at the same time. For a custom installation or a redirected Documents folder, set `SCRATCHJR_EXE` or `SCRATCHJR_DATABASE` as described below.
 
 Both builds read and write the same `scratchjr.sqllite`. Run only one of them at a time: each holds the database in memory and writes its copy back when it closes, so whichever closes last overwrites the other's work.
 
@@ -242,7 +301,7 @@ A healthy result names the executable and lists your projects:
 ```json
 {
   "config": {
-    "executable": "C:\\Users\\SkieHackerYT\\AppData\\Local\\ScratchJR-Modified-KerneilGocotano\\app-1.0.1\\ScratchJr.exe",
+    "executable": "C:\\Users\\SkieHackerYT\\AppData\\Local\\ScratchJR-AI-Assisted\\app-1.0.2\\ScratchJr.exe",
     "database": "C:\\Users\\SkieHackerYT\\Documents\\ScratchJR\\scratchjr.sqllite"
   },
   "app": { "ready": true, "projects": [ { "ID": 1, "NAME": "Project 1" } ] }

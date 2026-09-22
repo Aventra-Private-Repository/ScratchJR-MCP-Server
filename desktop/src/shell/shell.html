@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Scratch.JR [ AI-Assisted ] v1.0.2</title>
+<link rel="stylesheet" href="shell.css">
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <webview id="sjr" src="../app/index.html" nodeintegration></webview>
+</div>
+
+<section class="assistant" id="assistant">
+  <header class="bar">
+    <div class="identity">
+      <span class="spark" aria-hidden="true"></span>
+      <h1>Assistant</h1>
+      <span class="model" id="model-label">Not configured</span>
+    </div>
+    <div class="actions">
+      <button type="button" class="ghost" id="clear-btn" title="Start a new conversation">New chat</button>
+      <button type="button" class="ghost" id="settings-btn" title="Choose a provider and paste an API key">Settings</button>
+      <button type="button" class="ghost danger hidden" id="stop-btn" title="Stop the assistant">Stop</button>
+    </div>
+  </header>
+
+  <div class="transcript" id="transcript">
+    <div class="empty" id="empty-state">
+      <p class="lead">Ask for a story and it gets built in the editor above.</p>
+      <div class="chips">
+        <button type="button" class="chip">Make a story about a dog in the park</button>
+        <button type="button" class="chip">Add a second page where it rains</button>
+        <button type="button" class="chip">Run my project and show me a screenshot</button>
+      </div>
+      <p class="hint" id="setup-hint">Open <strong>Settings</strong> and paste a DeepSeek or OpenRouter API key to begin.</p>
+    </div>
+  </div>
+
+  <form class="composer" id="composer">
+    <textarea id="input" rows="1" placeholder="Describe the story you want to build..." autocomplete="off"></textarea>
+    <button type="submit" id="send-btn" title="Send (Enter)">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 20.5 21 12 3 3.5 3 10l12 2-12 2z" fill="currentColor"/></svg>
+      <span class="sr">Send</span>
+    </button>
+  </form>
+</section>
+
+<script src="shell.js"></script>
+</body>
+</html>

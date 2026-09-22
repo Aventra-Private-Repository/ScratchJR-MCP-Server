@@ -8,7 +8,7 @@ export const desktopRoot = join(root, 'desktop');
 
 // Squirrel installs to %LOCALAPPDATA%\<installerName>\app-<version>\ScratchJr.exe.
 // The build from desktop/ comes first so it wins when a stock copy is also present.
-const installDirs = ['ScratchJR-Modified-KerneilGocotano', 'ScratchJr'];
+const installDirs = ['ScratchJR-AI-Assisted', 'ScratchJR-Modified-KerneilGocotano', 'ScratchJr'];
 
 export function findExecutable() {
   if (process.env.SCRATCHJR_EXE) return resolve(process.env.SCRATCHJR_EXE);

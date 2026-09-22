@@ -2,7 +2,8 @@
 //
 //   npm run one-click          (or double-click install.cmd)
 //
-// Steps: install dependencies, fetch the Electron runtime, build a Squirrel
+// Steps: install dependencies, fetch the Electron runtime, stage the MCP server,
+// build a Squirrel
 // installer, run it, then register the MCP server with the local Claude and
 // Codex clients. Each step prints what it is doing and stops on the first
 // failure with a message that says what to fix.
@@ -62,6 +63,9 @@ if (existsSync(electronBinary)) {
   run(process.execPath, ['install.js'], electronDir,
     'If this fails behind a proxy, set ELECTRON_MIRROR or download Electron 1.8.2-beta.3 by hand into desktop/node_modules/electron-prebuilt-compile/node_modules/electron/dist.');
 }
+
+say('Staging the MCP server inside the app');
+run(process.execPath, [join(root, 'scripts', 'bundle-mcp.js')], root);
 
 say('Building the installer');
 run(npm, ['run', 'make64'], desktopRoot);

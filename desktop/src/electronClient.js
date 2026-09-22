@@ -20,7 +20,11 @@ webFrame.setLayoutZoomLevelLimits(0, 0);
 /* eslint-enable import/no-unresolved  */  // --> ON
 
 
-const DEBUG =   remote.getCurrentWebContents().browserWindowOptions.isDebug;  // grab the DEBUG variable from main. This is passed through the BrowserWindow creation
+// The editor runs inside a <webview>, whose guest webContents carries no
+// browserWindowOptions, so the flag comes from the main process global instead.
+// The original path is kept for the case where this page is loaded directly.
+const ownWindowOptions = remote.getCurrentWebContents().browserWindowOptions;
+const DEBUG = ownWindowOptions ? ownWindowOptions.isDebug : remote.getGlobal('scratchJrDebug');
 const DEBUG_FILEIO =  DEBUG && true;       // saving and loading user files
 const DEBUG_RESOURCEIO = DEBUG && false;  // files from the application directory
 const DEBUG_NYI = DEBUG && true;          // stuff not yet implemented

@@ -1,8 +1,8 @@
 {
-    "name": "scratchjr-modified-kerneilgocotano",
-    "productName": "ScratchJR (Modified by Kerneil Gocotano)",
-    "version": "1.0.1",
-    "description": "ScratchJR Desktop Edition, modified by Kerneil Gocotano with a built-in MCP bridge",
+    "name": "scratch-jr-ai-assisted",
+    "productName": "Scratch.JR [ AI-Assisted ]",
+    "version": "1.0.2",
+    "description": "Scratch.JR with a built-in MCP bridge and an AI assistant panel",
     "main": "src/main.js",
     "scripts": {
         "start": "electron-forge start",

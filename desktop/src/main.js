@@ -65,6 +65,9 @@ if (process.env.SCRATCHJR_DOCUMENTS) {
 
 
 const DEBUG =  isDev;
+// Read by electronClient.js from inside the editor <webview>, which cannot see
+// the window options the flag used to travel on.
+global.scratchJrDebug = DEBUG;
 const DEBUG_DATABASE      = DEBUG && false;
 const DEBUG_FILEIO        = DEBUG && true;
 const DEBUG_RESOURCEIO    = DEBUG && false;
@@ -109,6 +112,9 @@ if (require('electron-squirrel-startup')) app.quit(); // eslint-disable-line glo
 // be closed automatically when the JavaScript object is garbage collected.
 let win;
 let dataStore;
+let editorContents;
+let settingsWindow;
+let aboutWindow;
 
 function createWindow() {
   // Create the browser window.
@@ -131,21 +137,19 @@ function createWindow() {
     win.setTitle(branding.windowTitle);
   });
 
-  const view = new BrowserView({
-    title: branding.windowTitle,
-    icon: `${__dirname}app/assets/icon/icon.png`,
-    webPreferences: {
-      nodeIntegration: false
-    },
+  dataStore = new ScratchJRDataStore(win);
+
+  // The editor runs inside a <webview> in the shell page rather than directly in
+  // the window. That gives it its own viewport, so its percentage-based layout
+  // shrinks to the top pane, and its own debugger target, so the MCP server
+  // attaches to the editor instead of to the assistant panel around it.
+  win.webContents.on('did-attach-webview', (event, guest) => {
+    editorContents = guest;
+    dataStore.setEditorContents(guest);
   });
 
-  dataStore = new ScratchJRDataStore(win);
-  win.setBrowserView(view);
-
-
-  // and load the index.html of the app.
   win.loadURL(url.format({
-    pathname: path.join(__dirname, 'app/index.html'),
+    pathname: path.join(__dirname, 'shell/shell.html'),
     protocol: 'file',
     slashes: true,
 
@@ -177,37 +181,68 @@ function createWindow() {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () => {
-	
-  createWindow();
-  
-  let template;
-  if (dataStore.hasRestoreDatabase()) {
-	   template = [
-	   {
-		  label: 'File',
-		  submenu: [
-				{ label: 'Restore projects', click: dataStore.restoreProjects.bind(dataStore) },
-				{ type: 'separator' },
-				{ role: 'quit' },
-		  ],
-		}];
-  } else {
-      template = [ 
-      {
-		  label: 'File',
-		  submenu: [
-				{ role: 'quit' },
-		  ],
-		}];
-  }  
-  
+// A small modal beside the main window: Settings and About share the shape.
+function openDialog(file, options) {
+  const dialogWindow = new BrowserWindow({
+    width: options.width,
+    height: options.height,
+    parent: win,
+    modal: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    title: options.title,
+    autoHideMenuBar: true,
+    show: false
+  });
+  dialogWindow.setMenu(null);
+  dialogWindow.loadURL(url.format({
+    pathname: path.join(__dirname, 'windows', file),
+    protocol: 'file',
+    slashes: true
+  }));
+  dialogWindow.once('ready-to-show', () => dialogWindow.show());
+  dialogWindow.on('page-title-updated', (event) => event.preventDefault());
+  return dialogWindow;
+}
 
-  const menu = Menu.buildFromTemplate(template);
+function openSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) { settingsWindow.focus(); return; }
+  settingsWindow = openDialog('settings.html', {width: 540, height: 640, title: 'Assistant Settings'});
+  settingsWindow.on('closed', () => { settingsWindow = null; });
+}
+
+function openAboutWindow() {
+  if (aboutWindow && !aboutWindow.isDestroyed()) { aboutWindow.focus(); return; }
+  aboutWindow = openDialog('about.html', {width: 480, height: 540, title: 'About ' + branding.productName});
+  aboutWindow.on('closed', () => { aboutWindow = null; });
+}
+
+ipcMain.on('open-ai-settings', () => openSettingsWindow());
+
+ipcMain.on('ai-settings-saved', () => {
+  if (win && !win.isDestroyed()) win.webContents.send('ai-settings-changed');
+});
+
+// This method will be called when Electron has finished
+// initialization and is ready to create browser windows.
+// Some APIs can only be used after this event occurs.
+app.on('ready', () => {
+
+  createWindow();
+
+  const fileItems = [];
+  if (dataStore.hasRestoreDatabase()) {
+    fileItems.push({label: 'Restore projects', click: dataStore.restoreProjects.bind(dataStore)});
+    fileItems.push({type: 'separator'});
+  }
+  fileItems.push({label: 'Settings...', accelerator: 'CmdOrCtrl+,', click: openSettingsWindow});
+  fileItems.push({label: 'About ' + branding.productName, click: openAboutWindow});
+  fileItems.push({type: 'separator'});
+  fileItems.push({role: 'quit'});
+
+  const menu = Menu.buildFromTemplate([{label: 'File', submenu: fileItems}]);
   Menu.setApplicationMenu(menu);
-  
-  
-  
 
 });
 
@@ -510,6 +545,9 @@ class ScratchJRDataStore {
         /** Cache of key to base64-encoded media value */
     this.mediaStrings = {};
     this.electronBrowserWindow = electronBrowserWindow; 
+    // Set once the editor <webview> attaches; renderer notifications have to
+    // reach the guest rather than the shell page that hosts it.
+    this.editorContents = null;
   }
     /** gets an md5 checksum of the data passed in.
         @param {object} data
@@ -527,6 +565,11 @@ class ScratchJRDataStore {
       if (DEBUG_DATABASE) debugLog('DatabaseManager created');
     }
     return this.databaseManager;
+  }
+
+  /** remembers the editor webview so notifications reach the editor, not the shell */
+  setEditorContents(contents) {
+    this.editorContents = contents;
   }
 
   /** returns whether there is a scratchjr.sqllite.restore in the Documents/ScratchJR folder */
@@ -554,7 +597,7 @@ class ScratchJRDataStore {
 			 // notify the electron client that the database has changed.
 			 // electron client will navigate back to the index.html
 			 // when it gets ipcRenderer.on('databaseRestored')
-		this.electronBrowserWindow.webContents.send('databaseRestored', {});
+		(this.editorContents || this.electronBrowserWindow.webContents).send('databaseRestored', {});
 	   
 	    dialog.showMessageBox(
 	    		this.electronBrowserWindow,

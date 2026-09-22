@@ -17,7 +17,8 @@
     "one-click": "node scripts/one-click.js",
     "app:install": "npm --prefix desktop install",
     "app:start": "npm --prefix desktop start",
-    "app:make": "npm --prefix desktop run make64"
+    "app:make": "node scripts/bundle-mcp.js && npm --prefix desktop run make64",
+    "app:bundle": "node scripts/bundle-mcp.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",

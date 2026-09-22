@@ -1,8 +1,8 @@
 {
     "edition": "free",
     "scratchJrVersion": "iOSv01",
-    "buildName": "ScratchJR (Modified by Kerneil Gocotano)",
-    "buildVersion": "1.0.1",
+    "buildName": "Scratch.JR [ AI-Assisted ]",
+    "buildVersion": "1.0.2",
     "useStoryStarters": false,
     "shareEnabled": false,
     "defaultSprite": "Blue.svg",
