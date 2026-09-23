@@ -1,8 +1,11 @@
 //
 //  agent.js - the tool-calling loop behind the assistant panel.
 //
-//  DeepSeek and OpenRouter both speak the OpenAI chat completions shape, so one
-//  client covers both and only the base URL and model differ.
+//  DeepSeek, OpenRouter, LM Studio and Ollama all speak the OpenAI chat
+//  completions shape, so one client covers all four and only the base URL, the
+//  model and the key differ. The two local ones need no key at all, and they
+//  report their thinking inside the reply rather than in a field of its own,
+//  which is the one place the code has to tell them apart.
 //
 //  The loop is deliberately bounded. Each round is a paid request, and a model
 //  that misreads a tool error can otherwise retry it indefinitely, so the round
@@ -74,6 +77,8 @@ class Agent {
   // returning the finished message in the non-streaming shape the loop expects.
   async complete(settings, emit) {
     const provider = settingsStore.PROVIDERS[settings.provider];
+    const local = settingsStore.isLocal(settings);
+    const endpoint = settingsStore.baseUrl(settings);
     const body = {
       model: settingsStore.activeModel(settings),
       messages: this.messages,
@@ -84,7 +89,9 @@ class Agent {
 
     // Asking for the thinking has to be explicit, and each provider spells it
     // differently. Only sent for the models that advertise it, since an unknown
-    // field is rejected outright by DeepSeek.
+    // field is rejected outright by DeepSeek. Never sent to a local server:
+    // isReasoningModel is false there, and the thinking is recovered from the
+    // <think> tags in the reply instead.
     if (settingsStore.isReasoningModel(settings)) {
       if (settings.provider === 'deepseek') body.thinking = {type: 'enabled'};
       else body.include_reasoning = true;
@@ -92,40 +99,60 @@ class Agent {
 
     log.info('Asking the model', {
       provider: provider.label,
+      endpoint: endpoint,
       model: body.model,
       messages: this.messages.length,
       thinking: Boolean(body.thinking || body.include_reasoning)
     });
 
-    const response = await fetch(`${provider.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey.trim()}`,
-        // OpenRouter attributes traffic with these; they are ignored elsewhere.
-        'HTTP-Referer': 'https://github.com/SkieAdmin',
-        'X-Title': 'Scratch.JR AI-Assisted'
-      },
-      body: JSON.stringify(body)
-    });
+    const headers = {
+      'Content-Type': 'application/json',
+      // OpenRouter attributes traffic with these; they are ignored elsewhere.
+      'HTTP-Referer': 'https://github.com/SkieAdmin',
+      'X-Title': 'Scratch.JR AI-Assisted'
+    };
+    // LM Studio and Ollama want no key. Sending an empty bearer is worse than
+    // sending none, since a proxy in front of either reads it as a bad key
+    // rather than as no key at all.
+    const key = settingsStore.apiKey(settings);
+    if (key) headers['Authorization'] = `Bearer ${key}`;
+
+    let response;
+    try {
+      response = await fetch(`${endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+    } catch (error) {
+      // A server that is not running drops the connection, so there is no
+      // status and no body to explain it with.
+      const failure = settingsStore.unreachableMessage(settings);
+      log.error('Could not reach the model', {endpoint: endpoint, reason: error.message});
+      throw new Error(failure);
+    }
 
     if (!response.ok) {
       const text = await response.text();
-      const failure = describeApiFailure(response.status, text, provider.label);
+      const failure = describeApiFailure(response.status, text, provider.label, local);
       log.error('The model refused the request', {status: response.status, reason: failure});
       throw new Error(failure);
     }
 
-    return await this.readStream(response, provider, emit);
+    return await this.readStream(response, provider, emit, local);
   }
 
-  async readStream(response, provider, emit) {
+  async readStream(response, provider, emit, local) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     const message = {role: 'assistant', content: '', tool_calls: []};
     let reasoning = '';
     let buffer = '';
     let sawAnything = false;
+    // Only a local model hides its thinking in the reply text; a hosted one
+    // sends it in a field, and running the splitter there would eat a <think>
+    // that a child actually asked to have written on screen.
+    const think = local ? createThinkSplitter() : null;
 
     this.reader = reader;
     try {
@@ -162,8 +189,15 @@ class Agent {
               emit({type: 'reasoning-delta', text: text});
             }
             if (delta.content) {
-              message.content += delta.content;
-              emit({type: 'assistant-delta', text: delta.content});
+              const split = think ? think.push(delta.content) : {thinking: '', content: delta.content};
+              if (split.thinking) {
+                reasoning += split.thinking;
+                emit({type: 'reasoning-delta', text: split.thinking});
+              }
+              if (split.content) {
+                message.content += split.content;
+                emit({type: 'assistant-delta', text: split.content});
+              }
             }
             for (const call of delta.tool_calls || []) {
               mergeToolCall(message.tool_calls, call);
@@ -173,6 +207,13 @@ class Agent {
       }
     } finally {
       this.reader = null;
+    }
+
+    // A tag held back for the next chunk that never came is ordinary text.
+    if (think) {
+      const rest = think.flush();
+      if (rest.thinking) { reasoning += rest.thinking; emit({type: 'reasoning-delta', text: rest.thinking}); }
+      if (rest.content) { message.content += rest.content; emit({type: 'assistant-delta', text: rest.content}); }
     }
 
     if (!sawAnything && !this.cancelled) {
@@ -188,7 +229,10 @@ class Agent {
     // With tools in the request, DeepSeek requires every earlier turn's
     // reasoning_content to be sent back with it; leaving it out is a 400 on the
     // next round. It is kept on the message for that reason, not for display.
-    if (reasoning) message.reasoning_content = reasoning;
+    // A local model is the other way round: its thinking was stripped out of
+    // the content above and is not sent back, which is what those models are
+    // trained to expect and keeps the context from filling with old thinking.
+    if (reasoning && !local) message.reasoning_content = reasoning;
     if (!message.tool_calls.length) delete message.tool_calls;
     return message;
   }
@@ -198,7 +242,7 @@ class Agent {
   async run(userText, emit) {
     const settings = settingsStore.read();
     if (!settingsStore.isConfigured(settings)) {
-      throw new Error('No API key yet. Open File > Settings and paste a DeepSeek or OpenRouter key.');
+      throw new Error(settingsStore.setupMessage(settings));
     }
 
     this.cancelled = false;
@@ -282,19 +326,85 @@ function mergeToolCall(calls, fragment) {
   if (part.arguments) call.function.arguments += part.arguments;
 }
 
-function describeApiFailure(status, body, providerLabel) {
+function describeApiFailure(status, body, providerLabel, local) {
   let detail = (body || '').trim();
   try {
     const parsed = JSON.parse(body);
     if (parsed.error && parsed.error.message) detail = parsed.error.message;
+    else if (typeof parsed.error === 'string') detail = parsed.error;
   } catch (error) { /* keep the raw body */ }
   if (detail.length > 300) detail = detail.slice(0, 300) + '...';
 
   if (status === 401 || status === 403) return `${providerLabel} rejected the API key. Check it in File > Settings. ${detail}`;
   if (status === 402) return `${providerLabel} says the account is out of credit. ${detail}`;
-  if (status === 404) return `${providerLabel} does not know that model name. Check it in File > Settings. ${detail}`;
+  if (status === 404) {
+    // On a local server this nearly always means the model is not downloaded
+    // rather than misspelt, and saying so saves a round of guessing.
+    if (local) return `${providerLabel} has no such model loaded. Download it first, then press Refresh in File > Settings. ${detail}`;
+    return `${providerLabel} does not know that model name. Check it in File > Settings. ${detail}`;
+  }
   if (status === 429) return `${providerLabel} is rate limiting this key. Wait a moment and try again. ${detail}`;
+  // A local model too small for the request runs out of context rather than
+  // money, and the fix is a different model or a shorter chat, not a top-up.
+  if (local && status === 400 && /context|token/i.test(detail)) {
+    return `${providerLabel} ran out of room for the conversation. Start a new chat, or pick a model with a larger context. ${detail}`;
+  }
   return `${providerLabel} returned an error (${status}). ${detail}`;
+}
+
+// Local models with a thinking mode wrap it in <think> tags inside the ordinary
+// content stream instead of sending it in a field, so it has to be pulled back
+// out for the panel to show it in its own folded block. A tag can straddle two
+// deltas, so any tail that could be the start of one is held back until the
+// next chunk settles it.
+const THINK_OPEN = '<think>';
+const THINK_CLOSE = '</think>';
+
+function createThinkSplitter() {
+  let buffer = '';
+  let inside = false;
+
+  function take(out, text) {
+    if (inside) out.thinking += text; else out.content += text;
+  }
+
+  return {
+    push(text) {
+      buffer += text;
+      const out = {thinking: '', content: ''};
+      for (;;) {
+        const tag = inside ? THINK_CLOSE : THINK_OPEN;
+        const at = buffer.indexOf(tag);
+        if (at !== -1) {
+          take(out, buffer.slice(0, at));
+          buffer = buffer.slice(at + tag.length);
+          inside = !inside;
+          continue;
+        }
+        // No whole tag left. Release everything that cannot be the start of one.
+        const held = partialTagLength(buffer, tag);
+        take(out, buffer.slice(0, buffer.length - held));
+        buffer = buffer.slice(buffer.length - held);
+        return out;
+      }
+    },
+    // Whatever was being held back when the stream ended is just text.
+    flush() {
+      const out = {thinking: '', content: ''};
+      take(out, buffer);
+      buffer = '';
+      return out;
+    }
+  };
+}
+
+// How many of the trailing characters of `text` could begin `tag`.
+function partialTagLength(text, tag) {
+  const most = Math.min(tag.length - 1, text.length);
+  for (let length = most; length > 0; length--) {
+    if (text.slice(text.length - length) === tag.slice(0, length)) return length;
+  }
+  return 0;
 }
 
 module.exports = {Agent, SYSTEM_PROMPT};

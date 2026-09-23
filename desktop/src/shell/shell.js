@@ -343,6 +343,7 @@ function stopActivity() {
 function refreshStatus() {
   const settings = settingsStore.read();
   const provider = settingsStore.PROVIDERS[settings.provider];
+  const local = settingsStore.isLocal(settings);
   if (settingsStore.isConfigured(settings)) {
     const thinks = settingsStore.isReasoningModel(settings) ? ' - thinks first' : '';
     modelLabel.textContent = `${provider.label} - ${settingsStore.activeModel(settings)}${thinks}`;
@@ -351,7 +352,9 @@ function refreshStatus() {
   } else {
     modelLabel.textContent = 'Not configured';
     spark.classList.remove('ready');
-    input.placeholder = 'Add an API key in Settings...';
+    // A local provider needs a model picked, not a key bought, and being told
+    // to find an API key that does not exist would send someone looking for it.
+    input.placeholder = local ? 'Choose a model in Settings...' : 'Add an API key in Settings...';
   }
   const hint = document.getElementById('setup-hint');
   if (hint) hint.style.display = settingsStore.isConfigured(settings) ? 'none' : '';
@@ -524,8 +527,9 @@ async function send(text) {
   // Checked here rather than at the end of the chain: starting the tool server
   // can mean downloading Node, which is a lot to do before finding out that
   // there is no key to send anything with.
-  if (!settingsStore.isConfigured(settingsStore.read())) {
-    addTurn('error', 'No API key yet. Open File > Settings and paste a DeepSeek or OpenRouter key.');
+  const configuring = settingsStore.read();
+  if (!settingsStore.isConfigured(configuring)) {
+    addTurn('error', settingsStore.setupMessage(configuring));
     return;
   }
 

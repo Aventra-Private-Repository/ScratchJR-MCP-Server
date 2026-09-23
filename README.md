@@ -44,7 +44,7 @@ Product name, version, installer name, and debug port live in `desktop/src/brand
 
 ## Built-in assistant
 
-The app has its own chat panel beside the editor, so a child can ask for a story without Claude Desktop, Codex or any other editor installed. You supply an API key; the app supplies the tools.
+The app has its own chat panel beside the editor, so a child can ask for a story without Claude Desktop, Codex or any other editor installed. You supply the model - a hosted one with your own API key, or LM Studio or Ollama running on the same computer; the app supplies the tools.
 
 ```
 +---------------------------+---------------+
@@ -61,12 +61,18 @@ The panel drives the same MCP tools an external editor would. Internally it star
 
 ### Choosing a provider
 
-Open **File > Settings**. Two providers are offered, both speaking the OpenAI chat completions shape:
+Open **File > Settings**. Four providers are offered, all speaking the OpenAI chat completions shape. Two are hosted and need an account; two run on this computer and need neither key nor internet connection:
 
-| Provider | Endpoint | Default model | Where to get a key |
+| Provider | Endpoint | Needs | Where to get it |
 | --- | --- | --- | --- |
-| DeepSeek | `api.deepseek.com/v1` | `deepseek-flash` | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) |
-| OpenRouter | `openrouter.ai/api/v1` | `~deepseek/deepseek-flash-latest` | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| DeepSeek | `api.deepseek.com/v1` | An API key, paid per message | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) |
+| OpenRouter | `openrouter.ai/api/v1` | An API key, paid per message | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| LM Studio | `127.0.0.1:1234/v1` | The app running, with its local server started | [lmstudio.ai](https://lmstudio.ai) |
+| Ollama | `127.0.0.1:11434/v1` | The app installed; it serves in the background | [ollama.com](https://ollama.com) |
+
+A key, a model and a server address are remembered separately for each provider, so switching between them does not disturb the settings of the one left behind.
+
+#### The hosted providers
 
 **Model** is a drop-down of the models worth picking, with the id the provider actually accepts:
 
@@ -82,7 +88,20 @@ The OpenRouter `latest` slugs follow DeepSeek as new versions land, so they do n
 
 Picking a thinking model turns the thinking on in the request, and the panel shows that thinking in a folded block of its own while it arrives.
 
-Settings are stored in `ai-settings.json` inside the app's `userData` folder, which survives updates. **The API key is written there in plain text**, so treat that file the way you would treat the key itself.
+#### LM Studio and Ollama
+
+Nothing leaves the computer and nothing is charged, but the model has to be running first:
+
+- **LM Studio** - open it, go to the **Developer** tab and start the local server.
+- **Ollama** - install it and pull a model, for example `ollama pull qwen3:8b`. It then serves in the background.
+
+**Model** is not a written list here, because it is whatever has been downloaded. **Refresh** asks the server what it has and fills the drop-down; **Test** says whether the server is answering at all. If neither reaches it, **Server address** takes another port, or the address of another machine on the same network.
+
+The assistant builds projects by calling tools, so pick a model that supports tool use - Ollama tags those at [ollama.com/search?c=tools](https://ollama.com/search?c=tools). A model that cannot call tools will talk about the story without building it. Smaller models also run out of room in a long conversation sooner; **New chat** clears it.
+
+A local thinking model, such as one of the `qwen3` or `r1` family, writes its thinking into the reply between `<think>` tags rather than sending it separately. The panel pulls that back out and shows it in the same folded block the hosted providers use, so the reply reads the same either way.
+
+Settings are stored in `ai-settings.json` inside the app's `userData` folder, which survives updates. **API keys are written there in plain text**, so treat that file the way you would treat the keys themselves.
 
 ### Logs
 

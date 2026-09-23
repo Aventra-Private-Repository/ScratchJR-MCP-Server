@@ -9,11 +9,11 @@
 
 <header class="head">
   <h1>Assistant Settings</h1>
-  <p>Choose a provider and paste your own API key. Nothing is sent anywhere until you send a message.</p>
+  <p>Choose a provider. The two hosted ones need your own API key; the two that run on this PC need no key and no account.</p>
 </header>
 
 <main class="body">
-  <div class="banner">
+  <div class="banner" id="banner">
     The key is stored in plain text on this computer, and every message you send costs money on your own account. Do not share this machine's settings file.
   </div>
 
@@ -22,7 +22,7 @@
     <div class="providers" id="providers"></div>
   </div>
 
-  <div class="field">
+  <div class="field" id="key-field">
     <label class="title" for="key">API key</label>
     <div class="row">
       <input type="password" id="key" placeholder="Paste your key" spellcheck="false" autocomplete="off">
@@ -31,9 +31,21 @@
     <p class="hint">Get one at <a id="key-link"></a></p>
   </div>
 
+  <div class="field" id="address-field">
+    <label class="title" for="address">Server address</label>
+    <div class="row">
+      <input type="text" id="address" spellcheck="false" autocomplete="off">
+      <button type="button" id="test">Test</button>
+    </div>
+    <p class="hint" id="address-hint"></p>
+  </div>
+
   <div class="field">
     <label class="title" for="model-choice">Model</label>
-    <select id="model-choice"></select>
+    <div class="row">
+      <select id="model-choice"></select>
+      <button type="button" id="refresh-models">Refresh</button>
+    </div>
     <input type="text" id="model" spellcheck="false" autocomplete="off" placeholder="Model id">
     <p class="hint" id="model-hint"></p>
   </div>

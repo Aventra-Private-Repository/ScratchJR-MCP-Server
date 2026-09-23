@@ -61,9 +61,9 @@ Two sizing traps are worth knowing if this CSS is ever touched. A `<webview>` is
 
 ### `src/ai/` (new directory)
 
-- `settings.js` reads and writes `ai-settings.json` in the Electron userData folder, and holds the provider table.
+- `settings.js` reads and writes `ai-settings.json` in the Electron userData folder, and holds the provider table. Keys, models and server addresses are kept per provider, since none of the four shares them; a file written before those maps existed is migrated once, on the first read that finds no maps in it.
 - `mcp.js` starts `src/server.js` as a child process and speaks MCP over stdio. It resolves the server path from `__dirname`, not `app.getAppPath()`, which under electron-forge's dev runner points at Electron's own `default_app.asar`.
-- `agent.js` runs the tool-calling loop against the OpenAI chat completions shape, which both DeepSeek and OpenRouter accept.
+- `agent.js` runs the tool-calling loop against the OpenAI chat completions shape, which DeepSeek, OpenRouter, LM Studio and Ollama all accept. The two local providers differ in three ways it has to handle: no `Authorization` header at all (an empty bearer reads as a bad key to anything sitting in front of them), no thinking flag in the request, and thinking that comes back inside `<think>` tags in the ordinary content stream rather than in a field. Those tags are split back out as the stream arrives, which means coping with a tag straddling two deltas, and the thinking is not echoed back on the next round the way DeepSeek requires.
 - `node-runtime.js` finds a Node 22+ to run the tool server with, and downloads the portable zip into `userData` when the machine has none. The zip is used rather than the installer so no administrator rights, UAC prompt or `PATH` change is involved, and an existing Node is never touched.
 
 ### `src/windows/` (new directory)

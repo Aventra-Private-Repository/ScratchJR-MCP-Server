@@ -84,30 +84,53 @@ input:focus, select:focus {
 }
 
 /* The model drop-down sits above the box for typing an id by hand, which is
-   only shown when the drop-down is on its last entry. */
-#model-choice { margin-bottom: 8px; }
+   only shown when the drop-down is on its last entry. Its Refresh button is a
+   row item, so the margin goes on the row rather than the select itself. */
+.field .row + #model { margin-top: 8px; }
 
-.providers { display: flex; }
+/* Two across rather than one long line: four tiles in a row leave no room for
+   the address under each name. */
+.providers {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -5px -10px;
+}
 
 .providers label {
-  flex: 1 1 0;
+  flex: 1 1 calc(50% - 10px);
   display: block;
   border: 1px solid var(--line);
   border-radius: 9px;
   padding: 11px 13px;
-  margin-right: 10px;
+  margin: 0 5px 10px;
   cursor: pointer;
   background: var(--surface-sunken);
 }
 
-.providers label:last-child { margin-right: 0; }
 .providers label.picked { border-color: var(--brand); background: #eff6ff; }
 .providers input { position: absolute; opacity: 0; pointer-events: none; }
 .providers .name { display: block; font-weight: 600; font-size: 13px; }
 .providers .url { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
 
+/* Marks the two providers that run on this machine, so the difference that
+   matters most - no key, no bill - is visible before one is picked. */
+.providers .tag {
+  float: right;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand);
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.providers label.picked .tag { background: var(--surface); }
+
 .row { display: flex; align-items: center; }
-.row input { flex: 1 1 auto; }
+.row input, .row select { flex: 1 1 auto; min-width: 0; }
 .row button { flex: 0 0 auto; margin-left: 8px; }
 
 button {
