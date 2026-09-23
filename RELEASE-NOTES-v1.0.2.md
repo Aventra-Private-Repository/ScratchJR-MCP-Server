@@ -1,8 +1,21 @@
 # Scratch.JR [ AI-Assisted ] v1.0.2
 
-A build of the ScratchJr desktop app with an AI assistant panel underneath the editor. Ask it for a story in plain words and it builds the project in the real editor: characters, backgrounds, pages and block scripts, then runs it and shows you a screenshot.
+A build of the ScratchJr desktop app with an AI assistant panel beside the editor. Ask it for a story in plain words and it builds the project in the real editor: characters, backgrounds, pages and block scripts, then runs it and shows you a screenshot.
 
 You bring your own API key. Nothing is sent anywhere until you send a message, and there is no account, subscription or telemetry in this app.
+
+## What is new in this build
+
+- **The assistant is a side bar now.** It sits on the right, the way a chat panel does in a code editor, instead of taking a strip off the bottom of the window.
+- **An AI-Assist tab on the right-hand edge** folds it away and brings it back. With it shut, ScratchJr has the whole window. Opening it widens the window rather than squeezing the editor, and the border between the two can be dragged to set the width. Both are remembered between runs.
+- **Replies stream as they are written**, with a strip that says what is happening - waiting, thinking, writing, or which tool is running - the seconds it has taken, and which round of the tool budget it is on. A thinking model's working is shown in a block of its own, and each tool row now says how long it took.
+- **The model is a drop-down** of the current DeepSeek models rather than a box to type an id into, with an entry for typing one anyway.
+- **Documents can be attached** to a message: `.md`, `.txt` and `.pdf`, by paperclip or by dropping them on the panel. A PDF's text is read on this machine.
+- **Everything is logged** to a `Logs` folder beside the app, one file per day, as `9-23-2026_Log.txt`. Startup, every message, every tool call and how long it took, every error. The API key is never written to it.
+- **Missing pieces are asked about, not assumed.** If Node.js is missing or too old, the app asks whether to install a copy for itself, and installs nothing if the answer is no. No administrator rights are needed either way.
+- **Fixed: nothing in Settings was ever saved.** Every save failed silently on this Electron version, which is why keys pasted into Settings did not stick. Paste your key once after installing this build and it will stay.
+- **Fixed: a thinking model lost its own thinking between rounds.** DeepSeek requires it back with the next request when tools are in play, so a story that took several steps could be rejected halfway.
+- **Fixed: Stop mid-way through a batch of tool calls** left the conversation in a state the provider rejects, so the next message failed too.
 
 ## Install
 
@@ -15,9 +28,9 @@ Windows will show a **"Windows protected your PC"** warning, because the install
 1. Open **File > Settings**.
 2. Choose **DeepSeek** or **OpenRouter**.
 3. Paste your API key. Get one at [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) or [openrouter.ai/keys](https://openrouter.ai/keys).
-4. Leave **Model name** blank for the provider's default, or type any model it accepts.
+4. Pick a **Model**. On DeepSeek that is `deepseek-flash` for quick answers or `deepseek-v4-pro` for one that thinks first; on OpenRouter the `latest` slugs follow DeepSeek as new versions land. The last entry in the list takes any other id the provider accepts.
 
-Then type something like *"make a story about a dog in the park"* into the chat box.
+Then type something like *"make a story about a dog in the park"* into the chat box, or attach a `.md`, `.txt` or `.pdf` plan and ask for that to be built.
 
 **Costs money.** Every message is a paid request on your own account, and one story usually takes several, because the assistant calls tools and reads the results. **Settings > Advanced > Tool rounds per message** caps how many times it may do that per message; twelve is the default.
 

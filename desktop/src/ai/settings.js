@@ -15,22 +15,44 @@ const path = require('path');
 const electron = require('electron');
 const app = electron.app || (electron.remote && electron.remote.app);
 
+// The model lists are what the Settings window offers in its drop-down. Each
+// entry is a real id the provider accepts today; `reasoning` marks the ones
+// that think before answering, which the panel shows in its own block.
 const PROVIDERS = {
   deepseek: {
     label: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
+    defaultModel: 'deepseek-flash',
     keyUrl: 'https://platform.deepseek.com/api_keys',
-    modelHint: 'deepseek-chat is the general model; deepseek-reasoner thinks longer and costs more.'
+    modelHint: 'Flash answers quickly and costs less. Pro thinks first, which is slower but better at long stories.',
+    models: [
+      {id: 'deepseek-flash', label: 'DeepSeek Flash - fast, everyday chat', reasoning: false},
+      {id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro - thinks before answering', reasoning: true}
+    ]
   },
   openrouter: {
     label: 'OpenRouter',
     baseUrl: 'https://openrouter.ai/api/v1',
-    defaultModel: 'deepseek/deepseek-chat',
+    defaultModel: '~deepseek/deepseek-flash-latest',
     keyUrl: 'https://openrouter.ai/keys',
-    modelHint: 'Use the full slug, for example deepseek/deepseek-chat or openai/gpt-4o-mini.'
+    modelHint: 'The "latest" slugs follow DeepSeek as new versions land, so they do not need changing here.',
+    models: [
+      {id: '~deepseek/deepseek-flash-latest', label: 'DeepSeek Flash (latest) - fast, everyday chat', reasoning: false},
+      {id: '~deepseek/deepseek-pro-latest', label: 'DeepSeek Pro (latest) - thinks before answering', reasoning: true},
+      {id: 'deepseek/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash - pinned version', reasoning: false},
+      {id: 'deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro - pinned version, thinks first', reasoning: true}
+    ]
   }
 };
+
+// True when the chosen model is one of the thinking models above. The agent
+// asks DeepSeek for that thinking explicitly, since a model that can think
+// does not always do so by default.
+function isReasoningModel(settings) {
+  const chosen = activeModel(settings);
+  const known = (PROVIDERS[settings.provider].models || []).find(model => model.id === chosen);
+  return known ? Boolean(known.reasoning) : /(-pro|pro-latest|reasoner)$/.test(chosen);
+}
 
 const DEFAULTS = {
   provider: 'deepseek',
@@ -38,6 +60,10 @@ const DEFAULTS = {
   model: '',
   // A confused model can otherwise loop on tool calls and quietly spend money.
   maxRounds: 12,
+  // The assistant panel folds away behind the edge tab; remembered per install.
+  assistantVisible: true,
+  // Width of that panel in pixels, set by dragging its edge.
+  assistantWidth: 380,
   // Blank means "work it out"; see resolveServerPath in mcp.js.
   mcpServerPath: '',
   nodePath: ''
@@ -59,10 +85,30 @@ function read() {
   return merged;
 }
 
+// Electron 1.8 runs Node 8, where mkdirSync has no recursive option: passing
+// one is read as a mode, so an existing folder throws EEXIST and every save
+// fails. Create a level at a time instead.
+function ensureDir(dir) {
+  try {
+    fs.mkdirSync(dir);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      ensureDir(path.dirname(dir));
+      fs.mkdirSync(dir);
+    } else if (error.code !== 'EEXIST') {
+      throw error;
+    }
+  }
+}
+
 function write(values) {
   const next = Object.assign(read(), values);
+  // Named, not valued: the key must never reach the log.
+  try {
+    require(path.join(__dirname, '..', 'log.js')).info('Settings written', {fields: Object.keys(values)});
+  } catch (error) { /* the log is never worth failing a save for */ }
   const file = settingsFile();
-  fs.mkdirSync(path.dirname(file), {recursive: true});
+  ensureDir(path.dirname(file));
   fs.writeFileSync(file, JSON.stringify(next, null, 2) + '\n', 'utf8');
   return next;
 }
@@ -77,4 +123,4 @@ function isConfigured(settings) {
   return Boolean((settings.apiKey || '').trim());
 }
 
-module.exports = {PROVIDERS, DEFAULTS, read, write, activeModel, isConfigured, settingsFile};
+module.exports = {PROVIDERS, DEFAULTS, read, write, activeModel, isReasoningModel, isConfigured, settingsFile};

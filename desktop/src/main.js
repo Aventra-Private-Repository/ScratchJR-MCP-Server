@@ -44,6 +44,7 @@ const { app, dialog, BrowserWindow, BrowserView, ipcMain, Menu } = require('elec
 /* eslint-enable import/no-unresolved  */  // --> ON
 
 const branding = require('./branding');
+const log = require('./log');
 
 // MCP integration.
 // The ScratchJr MCP server drives this window over the Chrome DevTools
@@ -115,17 +116,34 @@ let dataStore;
 let editorContents;
 let settingsWindow;
 let aboutWindow;
+// Width the window is currently carrying for the panel, so closing it gives
+// back exactly what opening it took.
+let lastPanelWidth = 0;
+
+// The editor needs 1000x800 to itself; the assistant panel is extra on top of
+// that, which is why the first window is opened wider when the screen allows.
+// The screen module throws if it is touched before the app is ready, so it is
+// fetched where it is used rather than with the rest of the requires.
+function workAreaFor(window) {
+  const screen = require('electron').screen;
+  return window ? screen.getDisplayMatching(window.getBounds()).workArea : screen.getPrimaryDisplay().workArea;
+}
+
+const MIN_WINDOW_WIDTH = 1000;
+const MIN_WINDOW_HEIGHT = 800;
+const PREFERRED_WINDOW_WIDTH = 1420;
 
 function createWindow() {
   // Create the browser window.
 
+  const area = workAreaFor(null);
 
   win = new BrowserWindow(
     {
-      width: 1020,
-      height: 800,
-      minHeight: 800,
-      minWidth: 1000,
+      width: Math.max(MIN_WINDOW_WIDTH, Math.min(PREFERRED_WINDOW_WIDTH, area.width)),
+      height: Math.max(MIN_WINDOW_HEIGHT, Math.min(900, area.height)),
+      minHeight: MIN_WINDOW_HEIGHT,
+      minWidth: MIN_WINDOW_WIDTH,
       title: branding.windowTitle,
       customVar: 'elephants',
       isDebug: DEBUG
@@ -136,6 +154,8 @@ function createWindow() {
     event.preventDefault();
     win.setTitle(branding.windowTitle);
   });
+
+  log.info('Main window created', {width: win.getSize()[0], height: win.getSize()[1]});
 
   dataStore = new ScratchJRDataStore(win);
 
@@ -162,6 +182,7 @@ function createWindow() {
 
   // Emitted when the window is closed.
   win.on('closed', () => {
+    log.info('Main window closed');
     // save the database if it has been opened.
     if (dataStore.databaseManager) {
       dataStore.databaseManager.save();
@@ -221,13 +242,77 @@ function openAboutWindow() {
 ipcMain.on('open-ai-settings', () => openSettingsWindow());
 
 ipcMain.on('ai-settings-saved', () => {
+  log.info('Assistant settings saved');
   if (win && !win.isDestroyed()) win.webContents.send('ai-settings-changed');
+});
+
+// Anything the panel wants in the log goes through here, so one file holds both
+// processes in the order things actually happened.
+ipcMain.on('log-entry', (event, entry) => {
+  const level = entry && entry.level === 'error' ? 'error' : entry && entry.level === 'warn' ? 'warn' : 'info';
+  log[level]((entry && entry.message) || '(no message)', entry && entry.detail);
+});
+
+// A crash that reaches here would otherwise be a dialog and nothing else.
+process.on('uncaughtException', error => {
+  log.error('Uncaught exception in the main process', error);
+  throw error;
+});
+
+// The assistant panel takes its width out of the editor's, and ScratchJr's own
+// frame stops laying out below 766px. So the window carries the panel rather
+// than the editor paying for it: opening it widens the window, closing it gives
+// that width back, and the minimum size is moved so it cannot be dragged into
+// squeezing the editor. A maximised window is left alone - there is nowhere to
+// grow to, and the editor still has room on any normal screen.
+ipcMain.on('assistant-layout', (event, layout) => {
+  if (!win || win.isDestroyed()) return;
+
+  const editorMin = Number(layout.editorMinWidth) || 766;
+  const panel = layout.visible ? Math.round(Number(layout.width) || 0) : 0;
+  const frame = win.getSize()[0] - win.getContentSize()[0];
+  const minimum = Math.max(MIN_WINDOW_WIDTH, editorMin + panel + frame);
+
+  win.setMinimumSize(minimum, MIN_WINDOW_HEIGHT);
+  log.info('Assistant panel layout', {visible: Boolean(layout.visible), width: panel, reason: layout.reason, windowMinimum: minimum});
+
+  // Recorded even when the window is not resized, so that hiding the panel
+  // later gives back the width it is actually holding.
+  const carried = lastPanelWidth;
+  lastPanelWidth = panel;
+
+  // Only the tab moves the window. Startup keeps the size the user left it at,
+  // and a drag is already the width they asked for.
+  if (layout.reason !== 'toggle' || win.isMaximized() || win.isFullScreen()) return;
+
+  const [width, height] = win.getSize();
+  const wanted = layout.visible ? width + panel : width - carried;
+
+  const area = workAreaFor(win);
+  const target = Math.max(minimum, Math.min(wanted, area.width));
+  if (target === width) return;
+
+  win.setSize(target, height);
+  // Growing rightwards can push the window off the screen edge; slide it back.
+  const bounds = win.getBounds();
+  const overflow = (bounds.x + bounds.width) - (area.x + area.width);
+  if (overflow > 0) win.setPosition(Math.max(area.x, bounds.x - overflow), bounds.y);
 });
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
+
+  log.prune();
+  log.info('App started', {
+    version: branding.version,
+    platform: `${process.platform} ${process.arch}`,
+    electron: process.versions.electron,
+    node: process.versions.node,
+    mcpDebugPort: branding.mcpDebugPort || 'off',
+    logs: log.directory()
+  });
 
   createWindow();
 

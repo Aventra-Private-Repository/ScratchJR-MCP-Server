@@ -15,6 +15,8 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
+const log = require(path.join(__dirname, '..', 'log.js'));
+
 const CALL_TIMEOUT_MS = 180000;
 
 // Candidates in order: an explicit setting, the copy staged beside the app, then
@@ -59,6 +61,7 @@ class McpSession {
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.NODE_OPTIONS;
 
+    log.info('Starting the MCP tool server', {node: nodePath, server: serverPath});
     this.child = spawn(nodePath, [serverPath], {
       cwd: path.dirname(path.dirname(serverPath)),
       env: env,
@@ -70,6 +73,7 @@ class McpSession {
     this.child.stderr.on('data', chunk => { this.stderr = (this.stderr + chunk).slice(-4000); });
 
     this.child.on('error', error => {
+      log.error('The MCP tool server could not be started', error);
       const reason = error.code === 'ENOENT'
         ? `Node.js was not found${nodePath === 'node' ? ' on PATH' : ` at ${nodePath}`}. Install Node 22 or newer, or set its path in Settings.`
         : error.message;
@@ -77,6 +81,7 @@ class McpSession {
     });
 
     this.child.on('exit', code => {
+      log.warn('The MCP tool server stopped', {exitCode: code, output: this.stderr.trim().slice(-400)});
       const detail = this.stderr ? ` Server output: ${this.stderr.trim().split('\n').pop()}` : '';
       this.fail(new Error(`The ScratchJr MCP server stopped (exit code ${code}).${detail}`));
       this.child = null;
@@ -133,11 +138,15 @@ class McpSession {
   // is told what went wrong so it can correct itself on the next round.
   async call(name, args) {
     let response;
+    const started = Date.now();
+    log.info('Tool call', {tool: name, arguments: args || {}});
     try {
       response = await this.send('tools/call', {name: name, arguments: args || {}});
     } catch (error) {
+      log.error('Tool call failed', {tool: name, ms: Date.now() - started, reason: error.message});
       return {text: error.message, images: [], isError: true};
     }
+    log.info('Tool call finished', {tool: name, ms: Date.now() - started, isError: Boolean(response.isError)});
     const content = response.content || [];
     return {
       text: content.filter(part => part.type === 'text').map(part => part.text).join('\n'),

@@ -13,6 +13,7 @@ const keyEl = document.getElementById('key');
 const revealEl = document.getElementById('reveal');
 const keyLinkEl = document.getElementById('key-link');
 const modelEl = document.getElementById('model');
+const modelChoiceEl = document.getElementById('model-choice');
 const modelHintEl = document.getElementById('model-hint');
 const roundsEl = document.getElementById('rounds');
 const nodeEl = document.getElementById('node');
@@ -45,16 +46,56 @@ function selectProvider(id) {
     label.querySelector('input').checked = picked;
   }
   modelEl.placeholder = provider.defaultModel;
-  modelHintEl.textContent = `Leave blank to use ${provider.defaultModel}. ${provider.modelHint}`;
+  modelHintEl.textContent = provider.modelHint;
   keyLinkEl.textContent = provider.keyUrl;
   keyLinkEl.onclick = () => shell.openExternal(provider.keyUrl);
+  fillModels(provider, settingsStore.activeModel(current));
 }
+
+// The drop-down carries the models worth picking; anything else the provider
+// offers can still be typed in, which is what the last entry is for.
+const CUSTOM = '__custom__';
+
+function fillModels(provider, chosen) {
+  modelChoiceEl.innerHTML = '';
+  for (const model of provider.models || []) {
+    const option = document.createElement('option');
+    option.value = model.id;
+    option.textContent = model.label;
+    modelChoiceEl.appendChild(option);
+  }
+  const other = document.createElement('option');
+  other.value = CUSTOM;
+  other.textContent = 'Something else - type the id below';
+  modelChoiceEl.appendChild(other);
+
+  const known = (provider.models || []).some(model => model.id === chosen);
+  modelChoiceEl.value = known ? chosen : CUSTOM;
+  modelEl.value = known ? '' : chosen;
+  showCustomModel(!known);
+}
+
+function showCustomModel(show) {
+  modelEl.style.display = show ? '' : 'none';
+}
+
+// What the next message will actually be sent to.
+function chosenModel() {
+  return modelChoiceEl.value === CUSTOM ? modelEl.value.trim() : modelChoiceEl.value;
+}
+
+modelChoiceEl.addEventListener('change', () => {
+  const custom = modelChoiceEl.value === CUSTOM;
+  showCustomModel(custom);
+  if (custom) modelEl.focus();
+});
 
 function load() {
   current = settingsStore.read();
-  selectProvider(current.provider);
   keyEl.value = current.apiKey || '';
-  modelEl.value = current.model || '';
+  // selectProvider fills the model drop-down, so it runs after the stored
+  // model is known and before anything reads the boxes back.
+  selectProvider(current.provider);
   roundsEl.value = current.maxRounds;
   nodeEl.value = current.nodePath || '';
   serverEl.value = current.mcpServerPath || '';
@@ -112,7 +153,7 @@ document.getElementById('save').addEventListener('click', () => {
   settingsStore.write({
     provider: current.provider,
     apiKey: keyEl.value.trim(),
-    model: modelEl.value.trim(),
+    model: chosenModel(),
     maxRounds: rounds,
     nodePath: nodeEl.value.trim(),
     mcpServerPath: serverEl.value.trim()

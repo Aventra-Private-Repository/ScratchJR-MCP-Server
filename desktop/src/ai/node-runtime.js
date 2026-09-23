@@ -18,6 +18,8 @@ const path = require('path');
 const electron = require('electron');
 const app = electron.app || (electron.remote && electron.remote.app);
 
+const log = require(path.join(__dirname, '..', 'log.js'));
+
 const MINIMUM_MAJOR = 22;
 // Used only if the version index cannot be reached.
 const FALLBACK_VERSION = 'v22.20.0';
@@ -115,6 +117,7 @@ async function installNode(onProgress) {
   const name = `node-${version}-win-${process.arch === 'ia32' ? 'x86' : 'x64'}`;
   const url = `https://nodejs.org/dist/${version}/${name}.zip`;
 
+  log.info('Downloading Node.js', {version: version, url: url});
   report(`Downloading Node.js ${version}. This happens once, and only because no suitable Node was found.`);
   const response = await fetch(url);
   if (!response.ok) {
@@ -127,7 +130,9 @@ async function installNode(onProgress) {
 
   report(`Unpacking ${Math.round(bytes.length / 1024 / 1024)} MB...`);
   const root = managedRoot();
-  fs.mkdirSync(root, {recursive: true});
+  // Electron 1.8 runs Node 8, where mkdirSync has no recursive option: passing
+  // one is read as a mode and an existing folder throws.
+  try { fs.mkdirSync(root); } catch (error) { if (error.code !== 'EEXIST') throw error; }
   try {
     await extractZip(zipFile, root);
   } finally {
@@ -143,19 +148,47 @@ async function installNode(onProgress) {
   if (!found || !found.ok) {
     throw new Error('The downloaded Node.js did not run. Install Node 22 yourself and set its path in Settings.');
   }
+  log.info('Node.js installed for this app', {version: found.version, path: found.path});
   report(`Node.js ${found.version} is ready.`);
   return found;
 }
 
 // The entry point the chat panel uses: return a usable Node, downloading one if
 // that is the only way. Never touches a Node that is already good enough.
-async function ensureNode(settings, onProgress) {
+//
+// `confirm` is asked before anything is downloaded, so the decision to install
+// belongs to whoever is at the keyboard rather than to the app. It is given
+// whatever Node was found, or null when there is none, and answers true or
+// false. Leaving it out keeps the old behaviour of installing straight away.
+async function ensureNode(settings, onProgress, confirm) {
   const existing = findNode(settings);
-  if (existing && existing.ok) return existing;
-  if (existing) {
+  if (existing && existing.ok) {
+    log.info('Using Node.js', {version: existing.version, path: existing.path});
+    return existing;
+  }
+
+  log.warn('No usable Node.js found', existing ? {found: existing.version, needs: MINIMUM_MAJOR} : {needs: MINIMUM_MAJOR});
+
+  if (typeof confirm === 'function') {
+    const agreed = await confirm(existing);
+    log.info('Node.js install prompt answered', {install: Boolean(agreed)});
+    if (!agreed) {
+      const error = new Error(existing
+        ? `Node ${existing.version} is too old for the ScratchJr tools, which need ${MINIMUM_MAJOR} or newer. Nothing was installed. Say so again when you want the newer copy, or set a path in File > Settings.`
+        : `The assistant needs Node.js ${MINIMUM_MAJOR} or newer to run its tools, and nothing was installed. Ask again when you want it, or install Node yourself and set its path in File > Settings.`);
+      error.declined = true;
+      throw error;
+    }
+  } else if (existing) {
     (onProgress || function () {})(`Node ${existing.version} is too old for the ScratchJr tools, which need ${MINIMUM_MAJOR} or newer. Fetching a newer copy for this app only; the one already installed is left alone.`);
   }
-  return installNode(onProgress);
+
+  try {
+    return await installNode(onProgress);
+  } catch (error) {
+    log.error('Node.js install failed', error);
+    throw error;
+  }
 }
 
 module.exports = {ensureNode, findNode, installNode, inspect, managedRoot, MINIMUM_MAJOR};

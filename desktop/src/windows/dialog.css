@@ -83,6 +83,10 @@ input:focus, select:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
+/* The model drop-down sits above the box for typing an id by hand, which is
+   only shown when the drop-down is on its last entry. */
+#model-choice { margin-bottom: 8px; }
+
 .providers { display: flex; }
 
 .providers label {

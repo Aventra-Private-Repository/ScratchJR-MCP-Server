@@ -44,17 +44,18 @@ Product name, version, installer name, and debug port live in `desktop/src/brand
 
 ## Built-in assistant
 
-The app has its own chat panel under the editor, so a child can ask for a story without Claude Desktop, Codex or any other editor installed. You supply an API key; the app supplies the tools.
+The app has its own chat panel beside the editor, so a child can ask for a story without Claude Desktop, Codex or any other editor installed. You supply an API key; the app supplies the tools.
 
 ```
-+-------------------------------+
-|  Scratch.JR editor            |  scrolls on its own
-+-------------------------------+
-|  Assistant chat               |  fixed height, scrolls on its own
-+-------------------------------+
++---------------------------+---------------+
+|  Scratch.JR editor        |  Assistant    |  <- AI-Assist tab
+|                           |  chat         |     on the edge
++---------------------------+---------------+
 ```
 
-The split is fixed rather than draggable. The editor is given the room ScratchJr was designed for instead of being squeezed into whatever the window has left, so the stage and the block palette stay a usable size; when the window is shorter than that, the editor pane scrolls.
+The panel is a side bar on the right, like the chat panel in a code editor. The **AI-Assist** tab on the right-hand edge folds it away and brings it back, and the editor takes the whole window whenever it is shut. The border between the two can be dragged to set the width.
+
+Opening the panel widens the window by the panel's width and closing it gives that width back, so the editor is never the one that pays for the chat. ScratchJr's own layout stops working below 766px wide, so the window will not let itself be made small enough to reach that; a maximised window is left where it is. Which side the panel was left on, and how wide, is remembered between runs.
 
 The panel drives the same MCP tools an external editor would. Internally it starts the server in `src/server.js` as a child process and that server drives the editor back through the debugging port, so one implementation of every tool serves both routes and they cannot drift apart.
 
@@ -64,12 +65,53 @@ Open **File > Settings**. Two providers are offered, both speaking the OpenAI ch
 
 | Provider | Endpoint | Default model | Where to get a key |
 | --- | --- | --- | --- |
-| DeepSeek | `api.deepseek.com/v1` | `deepseek-chat` | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) |
-| OpenRouter | `openrouter.ai/api/v1` | `deepseek/deepseek-chat` | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| DeepSeek | `api.deepseek.com/v1` | `deepseek-flash` | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) |
+| OpenRouter | `openrouter.ai/api/v1` | `~deepseek/deepseek-flash-latest` | [openrouter.ai/keys](https://openrouter.ai/keys) |
 
-Leave **Model name** blank to take the default, or type any model the provider accepts. OpenRouter wants the full slug, such as `openai/gpt-4o-mini`.
+**Model** is a drop-down of the models worth picking, with the id the provider actually accepts:
+
+| Provider | Choice | Model id |
+| --- | --- | --- |
+| DeepSeek | Flash - fast, everyday chat | `deepseek-flash` |
+| DeepSeek | V4 Pro - thinks before answering | `deepseek-v4-pro` |
+| OpenRouter | DeepSeek Flash (latest) | `~deepseek/deepseek-flash-latest` |
+| OpenRouter | DeepSeek Pro (latest) | `~deepseek/deepseek-pro-latest` |
+| OpenRouter | V4.1 Flash / V4 Pro, pinned | `deepseek/deepseek-v4.1-flash`, `deepseek/deepseek-v4-pro` |
+
+The OpenRouter `latest` slugs follow DeepSeek as new versions land, so they do not need changing here. The last entry in the drop-down, **Something else**, opens a box for any other id the provider accepts, such as `openai/gpt-4o-mini` on OpenRouter.
+
+Picking a thinking model turns the thinking on in the request, and the panel shows that thinking in a folded block of its own while it arrives.
 
 Settings are stored in `ai-settings.json` inside the app's `userData` folder, which survives updates. **The API key is written there in plain text**, so treat that file the way you would treat the key itself.
+
+### Logs
+
+Everything the app does is written to a plain text file: startup, the window, every message sent, every tool call and how long it took, every error, and what was installed. One file per day, in a **`Logs`** folder beside the app itself:
+
+```
+%LOCALAPPDATA%\ScratchJR-AI-Assisted\Logs\9-23-2026_Log.txt
+```
+
+Lines read:
+
+```
+[ 9-23-2026 08:58:24 ] [ INFO ] - Starting the MCP tool server {"node":"node.exe","server":"...\mcp\src\server.js"}
+[ 9-23-2026 08:58:28 ] [ INFO ] - Tool call finished {"tool":"scratchjr_status","ms":3225,"isError":false}
+[ 9-23-2026 08:59:02 ] [ WARN ] - No usable Node.js found {"needs":22}
+```
+
+Status is `INFO`, `WARN` or `ERROR`. The folder sits next to the app rather than inside the versioned folder, so an update does not take the logs with it; if that folder cannot be written - an install somewhere locked down - the app falls back to a `Logs` folder in its `userData` directory instead of failing. **The API key is never written**, in any line, including inside error text. Logs older than 30 days are deleted at startup.
+
+### When something is missing
+
+The assistant needs Node.js 22 or newer for its tool server. If there is none, or the one installed is too old, the app asks before doing anything about it:
+
+> **Something is missing** - The assistant needs Node.js to run the ScratchJr tools, and it is not installed on this computer.
+> Install a copy for this app only? **[ Install now ] [ Not now ]**
+
+**Not now** installs nothing and says so in the panel; the question comes back next time a message is sent. **Install now** downloads about 36 MB into the app's own folder, which needs no administrator rights and leaves any other Node.js alone.
+
+If the tool server itself cannot be found, the app says which setting points at it rather than failing halfway through a story.
 
 ### Cost and the round limit
 
@@ -89,9 +131,21 @@ The editor itself works without Node; only the assistant needs it.
 
 ### What the panel shows
 
-Each tool call appears as a collapsible row: click it to see the arguments and the result the model received. Screenshots taken by `scratchjr_screenshot` are shown inline. A failed call opens itself and is marked in red, so a wrong turn is visible rather than buried.
+Replies stream in as they are written, so there is something to watch from the first second rather than a blank panel until the whole answer lands. While a message is running, a strip under the heading says what is happening now - waiting for the model, thinking, writing the reply, or which tool is running - with the seconds counted and the round out of the tool budget.
+
+A thinking model's working arrives in a folded **Thinking** block, which closes itself once the answer starts.
+
+Each tool call appears as a collapsible row with how long it took: click it to see the arguments and the result the model received. Screenshots taken by `scratchjr_screenshot` are shown inline. A failed call opens itself and is marked in red, so a wrong turn is visible rather than buried.
 
 **New chat** clears the conversation and starts the model fresh. **Stop** interrupts a run that is going nowhere; it takes effect after the tool call in flight finishes.
+
+### Attaching a document
+
+The paperclip beside the message box takes a **`.md`**, **`.txt`** or **`.pdf`** file, and files can be dropped onto the panel instead. A PDF's text is pulled out on this machine; nothing is uploaded and nothing is sent anywhere until the message it is attached to is sent.
+
+Each attached file shows as a chip with how much text it holds and an x to take it off again. A document longer than 20,000 characters is cut there, and both the panel and the model are told it was cut, so a long plan costs a bounded amount. Attachments go with one message: after that they are part of the conversation and do not need attaching again.
+
+Only those three kinds are accepted. Anything else, including a scanned PDF with no text layer, is refused with a line saying why.
 
 ## About
 

@@ -11,23 +11,34 @@
   <webview id="sjr" src="../app/index.html" nodeintegration></webview>
 </div>
 
+<div class="resizer" id="resizer" title="Drag to resize the assistant"></div>
+
 <section class="assistant" id="assistant">
   <header class="bar">
     <div class="identity">
       <span class="spark" aria-hidden="true"></span>
-      <h1>Assistant</h1>
-      <span class="model" id="model-label">Not configured</span>
+      <h1>AI-Assist</h1>
     </div>
     <div class="actions">
       <button type="button" class="ghost" id="clear-btn" title="Start a new conversation">New chat</button>
       <button type="button" class="ghost" id="settings-btn" title="Choose a provider and paste an API key">Settings</button>
-      <button type="button" class="ghost danger hidden" id="stop-btn" title="Stop the assistant">Stop</button>
     </div>
   </header>
 
+  <div class="model-strip">
+    <span class="model" id="model-label">Not configured</span>
+  </div>
+
+  <div class="activity hidden" id="activity">
+    <span class="pulse" aria-hidden="true"></span>
+    <span class="activity-text" id="activity-text">Thinking</span>
+    <span class="activity-meta" id="activity-meta"></span>
+    <button type="button" class="ghost danger" id="stop-btn" title="Stop the assistant">Stop</button>
+  </div>
+
   <div class="transcript" id="transcript">
     <div class="empty" id="empty-state">
-      <p class="lead">Ask for a story and it gets built in the editor above.</p>
+      <p class="lead">Ask for a story and it gets built in the editor beside you. Attach a .md, .txt or .pdf and it will read it first.</p>
       <div class="chips">
         <button type="button" class="chip">Make a story about a dog in the park</button>
         <button type="button" class="chip">Add a second page where it rains</button>
@@ -37,14 +48,27 @@
     </div>
   </div>
 
+  <div class="attachments hidden" id="attachments"></div>
+
   <form class="composer" id="composer">
-    <textarea id="input" rows="1" placeholder="Describe the story you want to build..." autocomplete="off"></textarea>
+    <button type="button" class="attach" id="attach-btn" title="Attach a .md, .txt or .pdf file">
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M16.5 6.5v8a4.5 4.5 0 0 1-9 0V6a3 3 0 0 1 6 0v8a1.5 1.5 0 0 1-3 0V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span class="sr">Attach a file</span>
+    </button>
+    <input type="file" id="file-input" accept=".md,.markdown,.txt,.pdf" multiple hidden>
+    <textarea id="input" rows="1" placeholder="Ask for a story..." autocomplete="off"></textarea>
     <button type="submit" id="send-btn" title="Send (Enter)">
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 20.5 21 12 3 3.5 3 10l12 2-12 2z" fill="currentColor"/></svg>
       <span class="sr">Send</span>
     </button>
   </form>
+
+  <div class="drop-veil" id="drop-veil">Drop a .md, .txt or .pdf file</div>
 </section>
+
+<button type="button" class="assist-toggle" id="assist-toggle" aria-controls="assistant" aria-expanded="true" title="Hide the assistant">
+  <span class="assist-toggle-label">AI-Assist</span>
+</button>
 
 <script src="shell.js"></script>
 </body>
